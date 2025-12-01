@@ -15,8 +15,8 @@ serve(async (req) => {
   try {
     const { limit = 10, cursor } = await req.json().catch(() => ({}));
 
-    // Fetch trending casts from Neynar Feed API
-    const url = new URL('https://api.neynar.com/v2/farcaster/feed/trending');
+    // Fetch for you feed from Neynar Feed API
+    const url = new URL('https://api.neynar.com/v2/farcaster/feed/for_you');
     url.searchParams.set('limit', limit.toString());
     if (cursor) {
       url.searchParams.set('cursor', cursor);
@@ -25,7 +25,7 @@ serve(async (req) => {
     const response = await fetch(url.toString(), {
       headers: {
         'accept': 'application/json',
-        'api_key': NEYNAR_API_KEY || '',
+        'x-api-key': NEYNAR_API_KEY || '',
       },
     });
 
