@@ -113,11 +113,52 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
     },
   });
 
+  // Revoke token approval
+  const revokeMutation = useMutation({
+    mutationFn: async () => {
+      const user = await getFarcasterUser();
+      if (!user || !walletAddress) throw new Error("User not authenticated");
+
+      const provider = await sdk.wallet.ethProvider;
+      const walletClient = createWalletClient({
+        chain: celo,
+        transport: custom(provider),
+      });
+
+      // Set approval to 0 to revoke
+      const hash = await (walletClient.writeContract as any)({
+        address: tokenAddress as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [CELOTIP_CONTRACT_ADDRESS as `0x${string}`, 0n],
+        account: walletAddress as `0x${string}`,
+        chain: celo,
+      }) as `0x${string}`;
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      // Delete from database
+      await supabase
+        .from("token_approvals")
+        .delete()
+        .eq("fid", user.fid)
+        .eq("token_address", tokenAddress);
+
+      return hash;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tokenAllowance"] });
+      queryClient.invalidateQueries({ queryKey: ["approvalRecord"] });
+    },
+  });
+
   return {
     allowance,
     approvalRecord,
     isLoading: isLoadingAllowance,
     approve: approveMutation.mutateAsync,
     isApproving: approveMutation.isPending,
+    revoke: revokeMutation.mutateAsync,
+    isRevoking: revokeMutation.isPending,
   };
 };

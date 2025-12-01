@@ -42,7 +42,7 @@ const DEFAULT_TOKEN: Token = {
 };
 
 const Settings = () => {
-  const { allowance, approve, isApproving } = useTokenApproval(TOKEN_ADDRESSES.cUSD, "cUSD");
+  const { allowance, approve, isApproving, revoke, isRevoking } = useTokenApproval(TOKEN_ADDRESSES.cUSD, "cUSD");
   
   const [tipConfigs, setTipConfigs] = useState<Record<string, TipConfig>>({
     like: { enabled: true, amount: "0.01", token: DEFAULT_TOKEN },
@@ -121,6 +121,22 @@ const Settings = () => {
     } catch (error: any) {
       toast({
         title: "Approval Failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRevokeApproval = async () => {
+    try {
+      await revoke();
+      toast({
+        title: "Approval Revoked",
+        description: "Token approval has been revoked successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Revoke Failed",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
@@ -282,16 +298,17 @@ const Settings = () => {
                 <Button 
                   onClick={handleIncreaseAllowance} 
                   className="flex-1 bg-primary hover:bg-primary/90"
-                  disabled={isApproving}
+                  disabled={isApproving || isRevoking}
                 >
                   {isApproving ? "Approving..." : "Approve"}
                 </Button>
                 <Button 
+                  onClick={handleRevokeApproval}
                   variant="outline" 
                   className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  disabled
+                  disabled={isApproving || isRevoking || !allowance || parseFloat(allowance) === 0}
                 >
-                  Revoke Approval
+                  {isRevoking ? "Revoking..." : "Revoke Approval"}
                 </Button>
               </div>
             </div>
