@@ -53,8 +53,11 @@ export const getWalletAddress = async (): Promise<string | null> => {
     console.log("Farcaster context for wallet:", context);
     
     // Access wallet from Farcaster context
-    // The SDK provides wallet through context.client or context.wallet
-    const walletAddress = (context as any).client?.ethAddress || 
+    // Try multiple possible locations for the wallet address
+    const walletAddress = (context as any).user?.verifications?.[0] || 
+                         (context as any).user?.custodyAddress ||
+                         (context as any).user?.connectedAddress ||
+                         (context as any).client?.ethAddress || 
                          (context as any).wallet?.ethAddress ||
                          null;
     
