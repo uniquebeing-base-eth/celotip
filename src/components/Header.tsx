@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { useFarcasterAuth } from "@/hooks/useFarcasterAuth";
+import { WalletPopover } from "@/components/WalletPopover";
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -46,12 +47,14 @@ export const Header = ({ onSearch }: HeaderProps) => {
           {isLoading ? (
             <Skeleton className="h-12 w-12 rounded-full" />
           ) : user ? (
-            <Avatar className="h-12 w-12 border-2 border-primary/20 shadow-sm">
-              <AvatarImage src={user.pfpUrl} alt={user.username} />
-              <AvatarFallback className="bg-secondary text-secondary-foreground">
-                <User className="h-5 w-5" />
-              </AvatarFallback>
-            </Avatar>
+            <WalletPopover>
+              <Avatar className="h-12 w-12 border-2 border-primary/20 shadow-sm cursor-pointer hover:border-primary/40 transition-colors">
+                <AvatarImage src={user.pfpUrl} alt={user.username} />
+                <AvatarFallback className="bg-secondary text-secondary-foreground">
+                  <User className="h-5 w-5" />
+                </AvatarFallback>
+              </Avatar>
+            </WalletPopover>
           ) : (
             <Avatar className="h-12 w-12 border-2 border-primary/20 shadow-sm">
               <AvatarFallback className="bg-secondary text-secondary-foreground">
