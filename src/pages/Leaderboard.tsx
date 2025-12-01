@@ -33,7 +33,7 @@ const Leaderboard = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header username="Creator" />
+      <Header />
       
       <main className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
