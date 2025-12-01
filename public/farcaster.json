@@ -1,10 +1,10 @@
 {
   "accountAssociation": {
-    "header": "",
-    "payload": "",
-    "signature": ""
+    "header": "eyJmaWQiOjg0OTExNiwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGQzRDViRmMyOGJjMjA5OTg4NGEzNmVkNDE2NTY4NzRCQ2RENDYzMTUifQ",
+    "payload": "eyJkb21haW4iOiJjZWxvdGlwLnZlcmNlbC5hcHAifQ",
+    "signature": "+Tk8EeY7sa7atI7JRGjXkLGUtlEjE6AinBgJMTR05Mg6/b4e5uxFe+gLQq+XNJgeX9ZHGSvBxwe2coeQ4uw2QBs="
   },
-  "miniapp": {
+  "frame": {
     "version": "1",
     "name": "CeloTip",
     "iconUrl": "https://celotip.vercel.app/icon-512.png",
