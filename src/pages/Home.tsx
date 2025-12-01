@@ -53,7 +53,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header username="Creator" onSearch={setSearchQuery} />
+      <Header onSearch={setSearchQuery} />
       
       <main className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
