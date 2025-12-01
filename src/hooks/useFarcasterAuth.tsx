@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { getFarcasterUser } from "@/lib/farcaster";
+import { getFarcasterUser, getWalletAddress } from "@/lib/farcaster";
 import { supabase } from "@/integrations/supabase/client";
 
 interface FarcasterUser {
@@ -30,6 +30,9 @@ export const FarcasterAuthProvider = ({ children }: { children: ReactNode }) => 
       if (farcasterUser) {
         setUser(farcasterUser);
         
+        // Get wallet address for database storage
+        const walletAddress = await getWalletAddress();
+        
         // Upsert user profile in database
         const { error } = await supabase
           .from("profiles")
@@ -38,6 +41,7 @@ export const FarcasterAuthProvider = ({ children }: { children: ReactNode }) => 
             username: farcasterUser.username,
             display_name: farcasterUser.displayName,
             pfp_url: farcasterUser.pfpUrl,
+            connected_address: walletAddress,
             updated_at: new Date().toISOString(),
           }, {
             onConflict: "fid"

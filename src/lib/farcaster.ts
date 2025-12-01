@@ -43,6 +43,29 @@ export const getFarcasterUser = async () => {
   }
 };
 
+export const getWalletAddress = async (): Promise<string | null> => {
+  try {
+    if (!isSDKInitialized) {
+      await initializeFarcasterSDK();
+    }
+    
+    const context = await sdk.context;
+    console.log("Farcaster context for wallet:", context);
+    
+    // Access wallet from Farcaster context
+    // The SDK provides wallet through context.client or context.wallet
+    const walletAddress = (context as any).client?.ethAddress || 
+                         (context as any).wallet?.ethAddress ||
+                         null;
+    
+    console.log("Resolved wallet address:", walletAddress);
+    return walletAddress;
+  } catch (error) {
+    console.error("Failed to get wallet address:", error);
+    return null;
+  }
+};
+
 export const openUrl = (url: string) => {
   try {
     sdk.actions.openUrl(url);
