@@ -135,6 +135,90 @@ export type Database = {
           },
         ]
       }
+      token_approvals: {
+        Row: {
+          approved_amount: number
+          approved_at: string
+          contract_address: string
+          fid: number
+          id: string
+          spent_amount: number
+          token_address: string
+          tx_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_amount: number
+          approved_at?: string
+          contract_address: string
+          fid: number
+          id?: string
+          spent_amount?: number
+          token_address: string
+          tx_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_amount?: number
+          approved_at?: string
+          contract_address?: string
+          fid?: number
+          id?: string
+          spent_amount?: number
+          token_address?: string
+          tx_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          cast_hash: string | null
+          created_at: string
+          error_message: string | null
+          from_fid: number
+          id: string
+          interaction_type: string
+          status: string
+          to_fid: number
+          token_address: string
+          token_symbol: string
+          tx_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          cast_hash?: string | null
+          created_at?: string
+          error_message?: string | null
+          from_fid: number
+          id?: string
+          interaction_type: string
+          status?: string
+          to_fid: number
+          token_address: string
+          token_symbol: string
+          tx_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          cast_hash?: string | null
+          created_at?: string
+          error_message?: string | null
+          from_fid?: number
+          id?: string
+          interaction_type?: string
+          status?: string
+          to_fid?: number
+          token_address?: string
+          token_symbol?: string
+          tx_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
