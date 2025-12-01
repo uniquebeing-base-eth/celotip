@@ -12,6 +12,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { TokenSelector } from "@/components/TokenSelector";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useTokenApproval } from "@/hooks/useTokenApproval";
+import { TOKEN_ADDRESSES } from "@/lib/contracts";
 
 interface Token {
   symbol: string;
@@ -40,6 +42,8 @@ const DEFAULT_TOKEN: Token = {
 };
 
 const Settings = () => {
+  const { allowance, approve, isApproving } = useTokenApproval(TOKEN_ADDRESSES.cUSD, "cUSD");
+  
   const [tipConfigs, setTipConfigs] = useState<Record<string, TipConfig>>({
     like: { enabled: true, amount: "0.01", token: DEFAULT_TOKEN },
     comment: { enabled: true, amount: "0.01", token: DEFAULT_TOKEN },
@@ -56,7 +60,7 @@ const Settings = () => {
 
   const [tokenSelectorOpen, setTokenSelectorOpen] = useState(false);
   const [selectedConfigKey, setSelectedConfigKey] = useState<string | null>(null);
-  const [allowance, setAllowance] = useState("100.00");
+  const [approvalAmount, setApprovalAmount] = useState("100.00");
 
   const handleTokenSelect = (token: Token) => {
     if (selectedConfigKey) {
@@ -107,11 +111,20 @@ const Settings = () => {
     });
   };
 
-  const handleIncreaseAllowance = () => {
-    toast({
-      title: "Allowance Increased",
-      description: "Token approval transaction initiated. Please confirm in your wallet.",
-    });
+  const handleIncreaseAllowance = async () => {
+    try {
+      await approve(approvalAmount);
+      toast({
+        title: "Approval Successful",
+        description: `Approved ${approvalAmount} cUSD for CeloTip smart contract.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const interactionIcons = {
@@ -244,30 +257,40 @@ const Settings = () => {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="allowance" className="text-sm font-medium">Set spending limit</Label>
-                <p className="text-xs text-muted-foreground mb-2">Current limit: {allowance} cUSD</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Current allowance: {allowance ? parseFloat(allowance).toFixed(2) : "0.00"} cUSD
+                </p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={() => setAllowance((prev) => Math.max(0, parseFloat(prev) - 10).toFixed(2))}>
+                  <Button variant="outline" onClick={() => setApprovalAmount((prev) => Math.max(0, parseFloat(prev) - 10).toFixed(2))}>
                     <Minus className="h-4 w-4" />
                   </Button>
                   <Input
                     id="allowance"
                     type="number"
                     step="10"
-                    value={allowance}
-                    onChange={(e) => setAllowance(e.target.value)}
+                    value={approvalAmount}
+                    onChange={(e) => setApprovalAmount(e.target.value)}
                     className="flex-1 text-center"
                   />
-                  <Button variant="outline" onClick={() => setAllowance((prev) => (parseFloat(prev) + 10).toFixed(2))}>
+                  <Button variant="outline" onClick={() => setApprovalAmount((prev) => (parseFloat(prev) + 10).toFixed(2))}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={handleIncreaseAllowance} className="flex-1 bg-primary hover:bg-primary/90">
-                  Approve
+                <Button 
+                  onClick={handleIncreaseAllowance} 
+                  className="flex-1 bg-primary hover:bg-primary/90"
+                  disabled={isApproving}
+                >
+                  {isApproving ? "Approving..." : "Approve"}
                 </Button>
-                <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  disabled
+                >
                   Revoke Approval
                 </Button>
               </div>
