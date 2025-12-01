@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Heart, MessageCircle, Repeat2, Quote, Zap, HelpCircle, Plus, Minus, UserPlus, Wallet } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Quote, Zap, Shield, HelpCircle, Plus, Minus, UserPlus, Wallet } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -130,17 +130,6 @@ const Settings = () => {
         )
       );
 
-      // Save super tip if configured
-      if (localSuperTip.phrase && localSuperTip.amount) {
-        await upsertSuperTipConfig.mutateAsync({
-          trigger_phrase: localSuperTip.phrase,
-          token_address: localSuperTip.token.address,
-          token_symbol: localSuperTip.token.symbol,
-          amount: parseFloat(localSuperTip.amount),
-          is_enabled: true,
-        });
-      }
-
       setHasChanges(false);
       toast({
         title: "Settings Saved",
@@ -150,6 +139,47 @@ const Settings = () => {
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveSuperTip = async () => {
+    if (!user) {
+      toast({
+        title: "Not Authenticated",
+        description: "Please open this app in Farcaster",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!localSuperTip.phrase || !localSuperTip.amount) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both phrase and amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await upsertSuperTipConfig.mutateAsync({
+        trigger_phrase: localSuperTip.phrase,
+        token_address: localSuperTip.token.address,
+        token_symbol: localSuperTip.token.symbol,
+        amount: parseFloat(localSuperTip.amount),
+        is_enabled: true,
+      });
+
+      toast({
+        title: "Super Tip Saved",
+        description: "Your super tip phrase has been configured.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save super tip. Please try again.",
         variant: "destructive",
       });
     }
@@ -322,6 +352,61 @@ const Settings = () => {
             </Button>
           </Card>
 
+          {/* Approve Tokens for Tipping */}
+          <Card className="p-6 bg-gradient-card border-border shadow-card">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">Approve Tokens for Tipping</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              To enable automatic tipping, you need to approve each token you want to use. This allows the smart contract to send tips on your behalf.
+            </p>
+
+            <div className="space-y-3">
+              {DEFAULT_TOKENS.map((token) => (
+                <div key={token.address} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8 bg-primary/10">
+                      <AvatarFallback className="text-xs font-semibold text-primary">
+                        {token.symbol.slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{token.symbol}</p>
+                      <p className="text-xs text-muted-foreground">{token.name}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        toast({
+                          title: "Approve Token",
+                          description: `Approving ${token.symbol} for tipping...`,
+                        });
+                      }}
+                    >
+                      Approve
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        toast({
+                          title: "Revoke Approval",
+                          description: `Revoking ${token.symbol} approval...`,
+                        });
+                      }}
+                    >
+                      Revoke
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
           {/* Super Tip */}
           <Card className="p-6 bg-gradient-card border-border shadow-card">
             <div className="flex items-center gap-2 mb-4">
@@ -343,7 +428,6 @@ const Settings = () => {
                   value={localSuperTip.phrase}
                   onChange={(e) => {
                     setLocalSuperTip(prev => ({ ...prev, phrase: e.target.value }));
-                    setHasChanges(true);
                   }}
                 />
               </div>
@@ -368,13 +452,20 @@ const Settings = () => {
                     value={localSuperTip.amount}
                     onChange={(e) => {
                       setLocalSuperTip(prev => ({ ...prev, amount: e.target.value }));
-                      setHasChanges(true);
                     }}
                     className="text-center"
                     step="0.01"
                   />
                 </div>
               </div>
+
+              <Button 
+                onClick={handleSaveSuperTip} 
+                disabled={upsertSuperTipConfig.isPending || !localSuperTip.phrase || !localSuperTip.amount}
+                className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
+              >
+                {superTipConfig ? "Update Phrase" : "Add Phrase"}
+              </Button>
             </div>
           </Card>
 
