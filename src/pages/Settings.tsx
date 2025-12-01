@@ -26,13 +26,10 @@ interface TipConfig {
   token: Token;
 }
 
-interface SuperTipPhrase {
-  id: string;
+interface SuperTipConfig {
   phrase: string;
-  configs: {
-    comment: TipConfig;
-    quote: TipConfig;
-  };
+  amount: string;
+  token: Token;
 }
 
 const DEFAULT_TOKEN: Token = {
@@ -51,16 +48,11 @@ const Settings = () => {
     follow: { enabled: false, amount: "2000", token: DEFAULT_TOKEN },
   });
 
-  const [superTipPhrases, setSuperTipPhrases] = useState<SuperTipPhrase[]>([
-    {
-      id: "1",
-      phrase: "$UNIQ",
-      configs: {
-        comment: { enabled: true, amount: "0", token: DEFAULT_TOKEN },
-        quote: { enabled: true, amount: "0", token: DEFAULT_TOKEN },
-      },
-    },
-  ]);
+  const [superTip, setSuperTip] = useState<SuperTipConfig>({
+    phrase: "CELO",
+    amount: "20.00",
+    token: DEFAULT_TOKEN,
+  });
 
   const [tokenSelectorOpen, setTokenSelectorOpen] = useState(false);
   const [selectedConfigKey, setSelectedConfigKey] = useState<string | null>(null);
@@ -68,24 +60,8 @@ const Settings = () => {
 
   const handleTokenSelect = (token: Token) => {
     if (selectedConfigKey) {
-      if (selectedConfigKey.startsWith("super-")) {
-        const parts = selectedConfigKey.split("-");
-        const phraseId = parts[1];
-        const interactionType = parts[2] as "comment" | "quote";
-        
-        setSuperTipPhrases(phrases =>
-          phrases.map(phrase =>
-            phrase.id === phraseId
-              ? {
-                  ...phrase,
-                  configs: {
-                    ...phrase.configs,
-                    [interactionType]: { ...phrase.configs[interactionType], token },
-                  },
-                }
-              : phrase
-          )
-        );
+      if (selectedConfigKey === "super-tip") {
+        setSuperTip(prev => ({ ...prev, token }));
       } else {
         setTipConfigs(prev => ({
           ...prev,
@@ -110,23 +86,11 @@ const Settings = () => {
     }));
   };
 
-  const updateSuperTipAmount = (phraseId: string, type: "comment" | "quote", delta: number) => {
-    setSuperTipPhrases(phrases =>
-      phrases.map(phrase =>
-        phrase.id === phraseId
-          ? {
-              ...phrase,
-              configs: {
-                ...phrase.configs,
-                [type]: {
-                  ...phrase.configs[type],
-                  amount: Math.max(0, parseFloat(phrase.configs[type].amount) + delta).toFixed(6),
-                },
-              },
-            }
-          : phrase
-      )
-    );
+  const updateSuperTipAmount = (delta: number) => {
+    setSuperTip(prev => ({
+      ...prev,
+      amount: Math.max(0, parseFloat(prev.amount) + delta).toFixed(2),
+    }));
   };
 
   const toggleConfig = (key: string) => {
@@ -134,40 +98,6 @@ const Settings = () => {
       ...prev,
       [key]: { ...prev[key], enabled: !prev[key].enabled },
     }));
-  };
-
-  const toggleSuperTipConfig = (phraseId: string, type: "comment" | "quote") => {
-    setSuperTipPhrases(phrases =>
-      phrases.map(phrase =>
-        phrase.id === phraseId
-          ? {
-              ...phrase,
-              configs: {
-                ...phrase.configs,
-                [type]: { ...phrase.configs[type], enabled: !phrase.configs[type].enabled },
-              },
-            }
-          : phrase
-      )
-    );
-  };
-
-  const addSuperTipPhrase = () => {
-    const newPhrase: SuperTipPhrase = {
-      id: Date.now().toString(),
-      phrase: "",
-      configs: {
-        comment: { enabled: false, amount: "0", token: DEFAULT_TOKEN },
-        quote: { enabled: false, amount: "0", token: DEFAULT_TOKEN },
-      },
-    };
-    setSuperTipPhrases([...superTipPhrases, newPhrase]);
-  };
-
-  const updatePhrase = (phraseId: string, newPhrase: string) => {
-    setSuperTipPhrases(phrases =>
-      phrases.map(phrase => (phrase.id === phraseId ? { ...phrase, phrase: newPhrase } : phrase))
-    );
   };
 
   const handleSave = () => {
@@ -351,177 +281,90 @@ const Settings = () => {
               <h3 className="text-lg font-semibold text-foreground">Configure Super Tip</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-6">
-              Set your phrase, choose a token, tip any amount — your super tip, your rules.
+              Set your phrase, choose a token, tip any amount — your super tip works for both comments and quotes.
             </p>
 
-            <div className="space-y-6">
-              {superTipPhrases.map((phrase) => (
-                <div key={phrase.id} className="border border-border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Enter phrase (e.g. $UNIQ)"
-                      value={phrase.phrase}
-                      onChange={(e) => updatePhrase(phrase.id, e.target.value)}
-                      className="flex-1"
-                    />
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-xs rounded-full">Updated</span>
-                  </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="super-phrase" className="text-sm font-medium mb-2 block">
+                  Super Tip Phrase
+                </Label>
+                <Input
+                  id="super-phrase"
+                  placeholder="Enter phrase (e.g. CELO)"
+                  value={superTip.phrase}
+                  onChange={(e) => setSuperTip(prev => ({ ...prev, phrase: e.target.value }))}
+                  className="mb-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  When you comment or quote with this phrase, it triggers the super tip amount instead of normal tip.
+                </p>
+              </div>
 
-                  {/* Super Comment */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Heart className="h-4 w-4" />
-                        <Label className="text-sm font-medium">Super Comment</Label>
-                      </div>
-                      <Switch
-                        checked={phrase.configs.comment.enabled}
-                        onCheckedChange={() => toggleSuperTipConfig(phrase.id, "comment")}
-                      />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Token</Label>
+                  <button
+                    onClick={() => openTokenSelector("super-tip")}
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:border-primary transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6 bg-primary/10">
+                        <AvatarFallback className="text-xs font-semibold text-primary">
+                          {superTip.token.symbol.slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium text-foreground">{superTip.token.symbol}</span>
                     </div>
-
-                    <div className="space-y-2">
-                      <Input
-                        type="text"
-                        value={`$${phrase.configs.comment.amount}`}
-                        readOnly
-                        className="text-center bg-muted"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => openTokenSelector(`super-${phrase.id}-comment`)}
-                          className="flex items-center justify-center gap-2 p-2 rounded-lg border border-border bg-background hover:border-primary transition-colors"
-                        >
-                          <Avatar className="h-5 w-5 bg-primary/10">
-                            <AvatarFallback className="text-xs font-semibold text-primary">
-                              {phrase.configs.comment.token.symbol.slice(0, 1)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateSuperTipAmount(phrase.id, "comment", -0.01)}
-                            className="flex-1"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <Input
-                            type="number"
-                            value={phrase.configs.comment.amount}
-                            onChange={(e) => {
-                              setSuperTipPhrases(phrases =>
-                                phrases.map(p =>
-                                  p.id === phrase.id
-                                    ? {
-                                        ...p,
-                                        configs: {
-                                          ...p.configs,
-                                          comment: { ...p.configs.comment, amount: e.target.value },
-                                        },
-                                      }
-                                    : p
-                                )
-                              );
-                            }}
-                            className="text-center text-xs flex-1"
-                            step="0.000001"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateSuperTipAmount(phrase.id, "comment", 0.01)}
-                            className="flex-1"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Super Quote Cast */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Heart className="h-4 w-4" />
-                        <Label className="text-sm font-medium">Super Quote Cast</Label>
-                      </div>
-                      <Switch
-                        checked={phrase.configs.quote.enabled}
-                        onCheckedChange={() => toggleSuperTipConfig(phrase.id, "quote")}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Input
-                        type="text"
-                        value={`$${phrase.configs.quote.amount}`}
-                        readOnly
-                        className="text-center bg-muted"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => openTokenSelector(`super-${phrase.id}-quote`)}
-                          className="flex items-center justify-center gap-2 p-2 rounded-lg border border-border bg-background hover:border-primary transition-colors"
-                        >
-                          <Avatar className="h-5 w-5 bg-primary/10">
-                            <AvatarFallback className="text-xs font-semibold text-primary">
-                              {phrase.configs.quote.token.symbol.slice(0, 1)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateSuperTipAmount(phrase.id, "quote", -0.01)}
-                            className="flex-1"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <Input
-                            type="number"
-                            value={phrase.configs.quote.amount}
-                            onChange={(e) => {
-                              setSuperTipPhrases(phrases =>
-                                phrases.map(p =>
-                                  p.id === phrase.id
-                                    ? {
-                                        ...p,
-                                        configs: {
-                                          ...p.configs,
-                                          quote: { ...p.configs.quote, amount: e.target.value },
-                                        },
-                                      }
-                                    : p
-                                )
-                              );
-                            }}
-                            className="text-center text-xs flex-1"
-                            step="0.000001"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateSuperTipAmount(phrase.id, "quote", 0.01)}
-                            className="flex-1"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  </button>
                 </div>
-              ))}
 
-              <Button onClick={addSuperTipPhrase} variant="outline" className="w-full">
-                Add New Phrase
-              </Button>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Super Tip Amount</Label>
+                  <Input
+                    type="text"
+                    value={`$${superTip.amount}`}
+                    readOnly
+                    className="text-center bg-muted border-border"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => updateSuperTipAmount(-1)}
+                  className="h-12 flex-1"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  value={superTip.amount}
+                  onChange={(e) => setSuperTip(prev => ({ ...prev, amount: e.target.value }))}
+                  className="text-center h-12 flex-[2]"
+                  step="0.01"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => updateSuperTipAmount(1)}
+                  className="h-12 flex-1"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  Example: With phrase "<span className="font-semibold text-foreground">{superTip.phrase || "CELO"}</span>" 
+                  and amount <span className="font-semibold text-foreground">${superTip.amount}</span>, 
+                  when you comment or quote containing this phrase, it will automatically tip the creator 
+                  ${superTip.amount} instead of your normal tip amount.
+                </p>
+              </div>
             </div>
           </Card>
 
@@ -534,38 +377,58 @@ const Settings = () => {
 
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="item-1">
-                <AccordionTrigger className="text-sm font-medium">
-                  How does tipping work on Farcaster?
-                </AccordionTrigger>
+                <AccordionTrigger className="text-sm">How does tipping work?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  CeloTip automatically sends tokens to creators when you interact with their casts. Each interaction type (like, comment, recast, quote) has a preset tip amount that you configure in settings. All tips are displayed in cUSD value.
+                  CeloTip automatically tips creators when you interact with their casts on Farcaster. 
+                  Simply like, comment, recast, or quote their content, and your configured tip amount 
+                  in cUSD (or your chosen token) will be sent automatically.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-2">
-                <AccordionTrigger className="text-sm font-medium">
-                  How are tips triggered automatically?
-                </AccordionTrigger>
+                <AccordionTrigger className="text-sm">What triggers automatic tips?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  Once you approve tokens for tipping, every time you like, comment, recast, or quote a cast on Farcaster, the app automatically sends the configured tip amount to the creator. No additional action needed!
+                  Tips are triggered by your interactions on Farcaster: liking a cast, commenting, 
+                  recasting, quoting, or following a user. Each interaction type can have its own 
+                  configured amount in cUSD or other Celo tokens.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-3">
-                <AccordionTrigger className="text-sm font-medium">
-                  What tokens can I use for tipping?
-                </AccordionTrigger>
+                <AccordionTrigger className="text-sm">How do I configure tip amounts?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  You can use any ERC20 token on the Celo network. The default options are CELO (native token) and cUSD (stablecoin), but you can add custom tokens by entering their contract address.
+                  Use the "Set tipping amount" section above to configure how much you want to tip 
+                  for each interaction type. You can choose different tokens (cUSD, CELO, or custom 
+                  ERC20 tokens on Celo) and set different amounts for likes, comments, recasts, quotes, and follows.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-4">
-                <AccordionTrigger className="text-sm font-medium">
-                  What is token allowance?
-                </AccordionTrigger>
+                <AccordionTrigger className="text-sm">What is a Super Tip?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  Token allowance is the maximum amount of tokens you authorize CeloTip to spend on your behalf. You can increase or revoke this allowance at any time. This ensures you have full control over your funds.
+                  Super Tip lets you set a special phrase (like "CELO") and a larger tip amount. 
+                  When you comment or quote a cast containing that phrase, it will automatically 
+                  send the super tip amount instead of your normal tip amount. This is perfect for 
+                  showing extra appreciation to creators!
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="item-5">
+                <AccordionTrigger className="text-sm">What is programmatic tipping approval?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  To enable automatic tipping, you need to approve a spending limit for the CeloTip 
+                  smart contract. This allows the contract to automatically send tips on your behalf 
+                  when you interact with casts. You can increase, decrease, or revoke this approval 
+                  at any time.
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="item-6">
+                <AccordionTrigger className="text-sm">Can I use tokens other than cUSD?</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  Yes! CeloTip supports any ERC20 token on the Celo network. You can choose cUSD (stablecoin), 
+                  CELO (native token), or add custom token contracts. All tip displays show values in cUSD 
+                  for consistency, but you can tip with any token you prefer.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -578,7 +441,6 @@ const Settings = () => {
         open={tokenSelectorOpen}
         onClose={() => setTokenSelectorOpen(false)}
         onSelectToken={handleTokenSelect}
-        selectedToken={selectedConfigKey ? tipConfigs[selectedConfigKey]?.token : undefined}
       />
     </div>
   );
