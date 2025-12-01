@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "CeloTip",
+    "iconUrl": "/icon-512.png",
+    "homeUrl": "/",
+    "imageUrl": "/og-image.jpg",
+    "buttonTitle": "🚀 Launch",
+    "splashImageUrl": "/splash.jpg",
+    "splashBackgroundColor": "#35D07F",
+    "webhookUrl": ""
+  }
+}
