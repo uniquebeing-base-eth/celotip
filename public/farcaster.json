@@ -12,7 +12,7 @@
     "imageUrl": "https://celotip.vercel.app/og-image.jpg",
     "buttonTitle": "Start CeloTippin",
     "splashImageUrl": "https://celotip.vercel.app/splash.jpg",
-    "splashBackgroundColor": "#35D07F",
+    "splashBackgroundColor": "#FCFF52",
     "webhookUrl": ""
   }
 }
