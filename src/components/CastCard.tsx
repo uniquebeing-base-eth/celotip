@@ -34,7 +34,8 @@ export const CastCard = ({ cast }: CastCardProps) => {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
             <Coins className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold text-primary">{cast.totalTips.toFixed(2)} CELO</span>
+            <span className="text-sm font-semibold text-primary">${cast.totalTips.toFixed(2)}</span>
+            <span className="text-xs text-muted-foreground ml-1">cUSD</span>
           </div>
         </div>
 
