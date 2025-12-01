@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useFarcasterAuth } from "./useFarcasterAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TokenBalance {
   symbol: string;
@@ -48,14 +49,30 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
   useEffect(() => {
-    // In a real implementation, we'd get the connected wallet from Farcaster context
-    // For now, we'll use a placeholder
-    if (user) {
-      // Placeholder wallet address (in production, this would come from Farcaster signer)
-      setAddress("0x0000000000000000000000000000000000000000");
-    } else {
-      setAddress(null);
-    }
+    const loadWallet = async () => {
+      if (user) {
+        try {
+          // Get user profile from database which has connected_address
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("connected_address, custody_address")
+            .eq("fid", user.fid)
+            .single();
+
+          if (!error && data) {
+            // Use connected_address if available, otherwise custody_address
+            setAddress(data.connected_address || data.custody_address);
+          }
+        } catch (error) {
+          console.error("Error loading wallet:", error);
+          setAddress(null);
+        }
+      } else {
+        setAddress(null);
+      }
+    };
+
+    loadWallet();
   }, [user]);
 
   const refreshBalances = async () => {
