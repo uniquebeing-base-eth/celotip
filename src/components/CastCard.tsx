@@ -5,9 +5,6 @@ import { Card } from "@/components/ui/card";
 interface Cast {
   id: string;
   author: string;
-  authorFid: number;
-  authorPfp?: string;
-  authorDisplayName?: string;
   content: string;
   totalTips: number;
   topTippers: string[];
@@ -22,18 +19,13 @@ export const CastCard = ({ cast }: CastCardProps) => {
     <Card className="p-4 bg-gradient-card border-border shadow-card hover:shadow-elevated transition-all duration-300 hover:-translate-y-1">
       <div className="flex items-start gap-3 mb-3">
         <Avatar className="h-10 w-10 border-2 border-primary/10">
-          <AvatarImage src={cast.authorPfp || `https://api.dicebear.com/7.x/avataaars/svg?seed=${cast.author}`} />
+          <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${cast.author}`} />
           <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
             {cast.author.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm text-foreground mb-1">
-            @{cast.author}
-            {cast.authorDisplayName && (
-              <span className="ml-2 text-muted-foreground font-normal">{cast.authorDisplayName}</span>
-            )}
-          </h3>
+          <h3 className="font-semibold text-sm text-foreground mb-1">@{cast.author}</h3>
           <p className="text-sm text-foreground/80 leading-relaxed">{cast.content}</p>
         </div>
       </div>
@@ -47,23 +39,21 @@ export const CastCard = ({ cast }: CastCardProps) => {
           </div>
         </div>
 
-        {cast.topTippers.length > 0 && (
-          <div className="flex items-center -space-x-2">
-            {cast.topTippers.slice(0, 5).map((tipper, idx) => (
-              <Avatar key={idx} className="h-7 w-7 border-2 border-card shadow-sm hover:scale-110 transition-transform">
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${tipper}`} />
-                <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                  {tipper.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            {cast.topTippers.length > 5 && (
-              <div className="h-7 w-7 rounded-full bg-muted border-2 border-card flex items-center justify-center">
-                <span className="text-xs font-medium text-muted-foreground">+{cast.topTippers.length - 5}</span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="flex items-center -space-x-2">
+          {cast.topTippers.slice(0, 5).map((tipper, idx) => (
+            <Avatar key={idx} className="h-7 w-7 border-2 border-card shadow-sm hover:scale-110 transition-transform">
+              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${tipper}`} />
+              <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                {tipper.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          ))}
+          {cast.topTippers.length > 5 && (
+            <div className="h-7 w-7 rounded-full bg-muted border-2 border-card flex items-center justify-center">
+              <span className="text-xs font-medium text-muted-foreground">+{cast.topTippers.length - 5}</span>
+            </div>
+          )}
+        </div>
       </div>
     </Card>
   );

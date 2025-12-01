@@ -36,8 +36,6 @@ export const getFarcasterUser = async () => {
       username: context.user.username,
       displayName: context.user.displayName,
       pfpUrl: context.user.pfpUrl,
-      custodyAddress: null,
-      connectedAddress: null,
     };
   } catch (error) {
     console.error("Failed to get Farcaster user:", error);

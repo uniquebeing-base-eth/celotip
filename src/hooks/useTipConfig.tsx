@@ -60,7 +60,7 @@ export const useTipConfig = () => {
   });
 
   const upsertTipConfig = useMutation({
-    mutationFn: async (config: Omit<TipConfig, "id" | "fid">) => {
+    mutationFn: async (config: Omit<TipConfig, "id">) => {
       if (!user?.fid) throw new Error("User not authenticated");
 
       const { data, error } = await supabase

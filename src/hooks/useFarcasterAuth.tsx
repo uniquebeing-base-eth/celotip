@@ -7,8 +7,6 @@ interface FarcasterUser {
   username: string;
   displayName?: string;
   pfpUrl?: string;
-  custodyAddress?: string | null;
-  connectedAddress?: string | null;
 }
 
 interface FarcasterAuthContextType {
@@ -40,8 +38,6 @@ export const FarcasterAuthProvider = ({ children }: { children: ReactNode }) => 
             username: farcasterUser.username,
             display_name: farcasterUser.displayName,
             pfp_url: farcasterUser.pfpUrl,
-            custody_address: farcasterUser.custodyAddress,
-            connected_address: farcasterUser.connectedAddress,
             updated_at: new Date().toISOString(),
           }, {
             onConflict: "fid"
