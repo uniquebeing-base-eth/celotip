@@ -58,9 +58,9 @@ export const LeaderboardItem = ({ user }: LeaderboardItemProps) => {
           <div className={`text-right ${isTopThree ? 'scale-110' : ''}`}>
             <div className="flex items-center gap-1 text-primary font-bold">
               <TrendingUp className="h-4 w-4" />
-              <span>{user.amount.toFixed(2)}</span>
+              <span>${user.amount.toFixed(2)}</span>
             </div>
-            <span className="text-xs text-muted-foreground">CELO</span>
+            <span className="text-xs text-muted-foreground">cUSD</span>
           </div>
         </div>
       </div>
