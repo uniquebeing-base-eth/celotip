@@ -14,7 +14,127 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          connected_address: string | null
+          created_at: string
+          custody_address: string | null
+          display_name: string | null
+          fid: number
+          pfp_url: string | null
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          connected_address?: string | null
+          created_at?: string
+          custody_address?: string | null
+          display_name?: string | null
+          fid: number
+          pfp_url?: string | null
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          connected_address?: string | null
+          created_at?: string
+          custody_address?: string | null
+          display_name?: string | null
+          fid?: number
+          pfp_url?: string | null
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      super_tip_configs: {
+        Row: {
+          amount: number
+          created_at: string
+          fid: number
+          id: string
+          is_enabled: boolean
+          token_address: string
+          token_symbol: string
+          trigger_phrase: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fid: number
+          id?: string
+          is_enabled?: boolean
+          token_address: string
+          token_symbol: string
+          trigger_phrase: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fid?: number
+          id?: string
+          is_enabled?: boolean
+          token_address?: string
+          token_symbol?: string
+          trigger_phrase?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "super_tip_configs_fid_fkey"
+            columns: ["fid"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["fid"]
+          },
+        ]
+      }
+      tip_configs: {
+        Row: {
+          amount: number
+          created_at: string
+          fid: number
+          id: string
+          interaction_type: string
+          is_enabled: boolean
+          token_address: string
+          token_symbol: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fid: number
+          id?: string
+          interaction_type: string
+          is_enabled?: boolean
+          token_address: string
+          token_symbol: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fid?: number
+          id?: string
+          interaction_type?: string
+          is_enabled?: boolean
+          token_address?: string
+          token_symbol?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tip_configs_fid_fkey"
+            columns: ["fid"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["fid"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
