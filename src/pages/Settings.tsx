@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
@@ -7,111 +7,152 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Heart, MessageCircle, Repeat2, Quote, Zap, Shield, HelpCircle, Plus, Minus, ChevronDown, UserPlus } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Heart, MessageCircle, Repeat2, Quote, Zap, Shield, HelpCircle, Plus, Minus, ChevronDown, UserPlus, Wallet } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { TokenSelector } from "@/components/TokenSelector";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useTipConfig } from "@/hooks/useTipConfig";
+import { useWallet } from "@/hooks/useWallet";
+import { useFarcasterAuth } from "@/hooks/useFarcasterAuth";
 
 interface Token {
   symbol: string;
   name: string;
   address: string;
-  balance: string;
 }
 
-interface TipConfig {
-  enabled: boolean;
-  amount: string;
-  token: Token;
-}
-
-interface SuperTipConfig {
-  phrase: string;
-  amount: string;
-  token: Token;
-}
-
-const DEFAULT_TOKEN: Token = {
-  symbol: "cUSD",
-  name: "Celo Dollar",
-  address: "0x765DE816845861e75A25fCA122bb6898B8B1282a",
-  balance: "$45.50",
-};
+const DEFAULT_TOKENS: Token[] = [
+  {
+    symbol: "cUSD",
+    name: "Celo Dollar",
+    address: "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+  },
+  {
+    symbol: "CELO",
+    name: "Celo Native Asset",
+    address: "0x471EcE3750Da237f93B8E339c536989b8978a438",
+  },
+];
 
 const Settings = () => {
-  const [tipConfigs, setTipConfigs] = useState<Record<string, TipConfig>>({
-    like: { enabled: true, amount: "0.01", token: DEFAULT_TOKEN },
-    comment: { enabled: true, amount: "0.01", token: DEFAULT_TOKEN },
-    recast: { enabled: true, amount: "0.01", token: DEFAULT_TOKEN },
-    quote: { enabled: false, amount: "2000", token: DEFAULT_TOKEN },
-    follow: { enabled: false, amount: "2000", token: DEFAULT_TOKEN },
-  });
+  const { user, isLoading: isLoadingAuth } = useFarcasterAuth();
+  const { tipConfigs, superTipConfig, isLoading: isLoadingConfigs, upsertTipConfig, upsertSuperTipConfig, deleteSuperTipConfig } = useTipConfig();
+  const { address, balances, isLoadingBalances } = useWallet();
 
-  const [superTip, setSuperTip] = useState<SuperTipConfig>({
-    phrase: "CELO",
-    amount: "20.00",
-    token: DEFAULT_TOKEN,
-  });
+  // Local state for editing
+  const [localConfigs, setLocalConfigs] = useState<Record<string, { amount: string; token: Token; enabled: boolean }>>({});
+  const [localSuperTip, setLocalSuperTip] = useState({ phrase: "", amount: "", token: DEFAULT_TOKENS[0] });
+  const [hasChanges, setHasChanges] = useState(false);
 
-  const [tokenSelectorOpen, setTokenSelectorOpen] = useState(false);
-  const [selectedConfigKey, setSelectedConfigKey] = useState<string | null>(null);
-  const [allowance, setAllowance] = useState("100.00");
-
-  const handleTokenSelect = (token: Token) => {
-    if (selectedConfigKey) {
-      if (selectedConfigKey === "super-tip") {
-        setSuperTip(prev => ({ ...prev, token }));
-      } else {
-        setTipConfigs(prev => ({
-          ...prev,
-          [selectedConfigKey]: { ...prev[selectedConfigKey], token },
-        }));
-      }
+  // Initialize local state from database
+  useEffect(() => {
+    if (tipConfigs.length > 0) {
+      const configMap: Record<string, { amount: string; token: Token; enabled: boolean }> = {};
+      tipConfigs.forEach(config => {
+        configMap[config.interaction_type] = {
+          amount: config.amount.toString(),
+          token: {
+            symbol: config.token_symbol,
+            name: config.token_symbol,
+            address: config.token_address,
+          },
+          enabled: config.is_enabled,
+        };
+      });
+      setLocalConfigs(configMap);
+    } else {
+      // Set defaults if no configs exist
+      setLocalConfigs({
+        like: { amount: "0.01", token: DEFAULT_TOKENS[0], enabled: true },
+        comment: { amount: "0.01", token: DEFAULT_TOKENS[0], enabled: true },
+        recast: { amount: "0.01", token: DEFAULT_TOKENS[0], enabled: false },
+        quote: { amount: "0.01", token: DEFAULT_TOKENS[0], enabled: false },
+        follow: { amount: "0.01", token: DEFAULT_TOKENS[0], enabled: false },
+      });
     }
-  };
+  }, [tipConfigs]);
 
-  const openTokenSelector = (configKey: string) => {
-    setSelectedConfigKey(configKey);
-    setTokenSelectorOpen(true);
-  };
+  useEffect(() => {
+    if (superTipConfig) {
+      setLocalSuperTip({
+        phrase: superTipConfig.trigger_phrase,
+        amount: superTipConfig.amount.toString(),
+        token: {
+          symbol: superTipConfig.token_symbol,
+          name: superTipConfig.token_symbol,
+          address: superTipConfig.token_address,
+        },
+      });
+    }
+  }, [superTipConfig]);
 
   const updateAmount = (key: string, delta: number) => {
-    setTipConfigs(prev => ({
+    setLocalConfigs(prev => ({
       ...prev,
       [key]: {
         ...prev[key],
-        amount: Math.max(0, parseFloat(prev[key].amount) + delta).toFixed(2),
+        amount: Math.max(0, parseFloat(prev[key]?.amount || "0") + delta).toFixed(2),
       },
     }));
-  };
-
-  const updateSuperTipAmount = (delta: number) => {
-    setSuperTip(prev => ({
-      ...prev,
-      amount: Math.max(0, parseFloat(prev.amount) + delta).toFixed(2),
-    }));
+    setHasChanges(true);
   };
 
   const toggleConfig = (key: string) => {
-    setTipConfigs(prev => ({
+    setLocalConfigs(prev => ({
       ...prev,
-      [key]: { ...prev[key], enabled: !prev[key].enabled },
+      [key]: { ...prev[key], enabled: !prev[key]?.enabled },
     }));
+    setHasChanges(true);
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Settings Saved",
-      description: "Your tipping preferences have been updated.",
-    });
-  };
+  const handleSave = async () => {
+    if (!user) {
+      toast({
+        title: "Not Authenticated",
+        description: "Please open this app in Farcaster",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const handleIncreaseAllowance = () => {
-    toast({
-      title: "Allowance Increased",
-      description: "Token approval transaction initiated. Please confirm in your wallet.",
-    });
+    try {
+      // Save all tip configs
+      await Promise.all(
+        Object.entries(localConfigs).map(([type, config]) =>
+          upsertTipConfig.mutateAsync({
+            interaction_type: type as any,
+            token_address: config.token.address,
+            token_symbol: config.token.symbol,
+            amount: parseFloat(config.amount),
+            is_enabled: config.enabled,
+          })
+        )
+      );
+
+      // Save super tip if configured
+      if (localSuperTip.phrase && localSuperTip.amount) {
+        await upsertSuperTipConfig.mutateAsync({
+          trigger_phrase: localSuperTip.phrase,
+          token_address: localSuperTip.token.address,
+          token_symbol: localSuperTip.token.symbol,
+          amount: parseFloat(localSuperTip.amount),
+          is_enabled: true,
+        });
+      }
+
+      setHasChanges(false);
+      toast({
+        title: "Settings Saved",
+        description: "Your tipping preferences have been updated.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const interactionIcons = {
@@ -121,6 +162,36 @@ const Settings = () => {
     quote: <Quote className="h-5 w-5 text-purple-500" />,
     follow: <UserPlus className="h-5 w-5 text-orange-500" />,
   };
+
+  if (isLoadingAuth || isLoadingConfigs) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header />
+        <main className="max-w-2xl mx-auto px-4 py-6">
+          <Skeleton className="h-8 w-48 mb-6" />
+          <Card className="p-6">
+            <Skeleton className="h-20 mb-4" />
+            <Skeleton className="h-32" />
+          </Card>
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header />
+        <main className="max-w-2xl mx-auto px-4 py-6">
+          <Card className="p-6 text-center">
+            <p className="text-muted-foreground">Please open this app in Farcaster to configure settings</p>
+          </Card>
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -133,6 +204,37 @@ const Settings = () => {
         </div>
 
         <div className="space-y-6">
+          {/* Wallet Info */}
+          <Card className="p-6 bg-gradient-card border-border shadow-card">
+            <div className="flex items-center gap-2 mb-4">
+              <Wallet className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">Connected Wallet</h3>
+            </div>
+            {address ? (
+              <div className="space-y-3">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Address</p>
+                  <p className="text-sm font-mono">{address.slice(0, 6)}...{address.slice(-4)}</p>
+                </div>
+                {isLoadingBalances ? (
+                  <Skeleton className="h-20" />
+                ) : balances.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Balances</p>
+                    {balances.map((balance) => (
+                      <div key={balance.symbol} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                        <span className="text-sm font-medium">{balance.symbol}</span>
+                        <span className="text-sm">{balance.balance}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No wallet connected</p>
+            )}
+          </Card>
+
           {/* Tip Configuration */}
           <Card className="p-6 bg-gradient-card border-border shadow-card">
             <div className="flex items-center gap-2 mb-4">
@@ -144,80 +246,65 @@ const Settings = () => {
             </p>
 
             <div className="space-y-6">
-              {Object.entries(tipConfigs).map(([key, config]) => (
+              {Object.entries(localConfigs).map(([key, config]) => (
                 <div key={key}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       {interactionIcons[key as keyof typeof interactionIcons]}
                       <Label className="text-sm font-medium capitalize">{key}</Label>
                     </div>
-                    <Switch checked={config.enabled} onCheckedChange={() => toggleConfig(key)} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex gap-2">
-                      <p className="text-xs text-muted-foreground mb-2">status</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <p className="text-xs text-muted-foreground mb-2">tip amount per {key}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => openTokenSelector(key)}
-                      className="flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:border-primary transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6 bg-primary/10">
-                          <AvatarFallback className="text-xs font-semibold text-primary">
-                            {config.token.symbol.slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium text-foreground">{config.token.symbol}</span>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    </button>
-
-                    <Input
-                      type="text"
-                      value={`$${config.amount}`}
-                      readOnly
-                      className="text-center bg-muted border-border"
+                    <Switch 
+                      checked={config?.enabled || false} 
+                      onCheckedChange={() => toggleConfig(key)} 
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mt-2">
-                    <div></div>
-                    <div className="flex items-center justify-between gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => updateAmount(key, -0.01)}
-                        className="h-12 flex-1"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={config.amount}
-                        onChange={(e) =>
-                          setTipConfigs(prev => ({
-                            ...prev,
-                            [key]: { ...prev[key], amount: e.target.value },
-                          }))
-                        }
-                        className="text-center h-12 flex-1"
-                        step="0.01"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => updateAmount(key, 0.01)}
-                        className="h-12 flex-1"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Token</p>
+                      <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-background">
+                        <Avatar className="h-6 w-6 bg-primary/10">
+                          <AvatarFallback className="text-xs font-semibold text-primary">
+                            {config?.token.symbol.slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium">{config?.token.symbol}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Amount</p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => updateAmount(key, -0.01)}
+                          className="h-10"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          value={config?.amount || "0"}
+                          onChange={(e) => {
+                            setLocalConfigs(prev => ({
+                              ...prev,
+                              [key]: { ...prev[key], amount: e.target.value },
+                            }));
+                            setHasChanges(true);
+                          }}
+                          className="text-center h-10"
+                          step="0.01"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => updateAmount(key, 0.01)}
+                          className="h-10"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -226,55 +313,16 @@ const Settings = () => {
               ))}
             </div>
 
-            <Button onClick={handleSave} className="w-full mt-6 bg-gradient-primary hover:opacity-90 transition-opacity">
-              All Changes Saved
+            <Button 
+              onClick={handleSave} 
+              disabled={!hasChanges || upsertTipConfig.isPending}
+              className="w-full mt-6 bg-gradient-primary hover:opacity-90 transition-opacity"
+            >
+              {hasChanges ? "Save Changes" : "All Changes Saved"}
             </Button>
           </Card>
 
-          {/* Token Approval */}
-          <Card className="p-6 bg-gradient-card border-border shadow-card">
-            <div className="flex items-center gap-2 mb-4">
-              <Shield className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-foreground">Allow Programmatic Tipping</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-6">
-              Approve a spending limit for CeloTip on Farcaster. When it runs out, top it up or revoke it anytime.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="allowance" className="text-sm font-medium">Set spending limit</Label>
-                <p className="text-xs text-muted-foreground mb-2">Current limit: {allowance} cUSD</p>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={() => setAllowance((prev) => Math.max(0, parseFloat(prev) - 10).toFixed(2))}>
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="allowance"
-                    type="number"
-                    step="10"
-                    value={allowance}
-                    onChange={(e) => setAllowance(e.target.value)}
-                    className="flex-1 text-center"
-                  />
-                  <Button variant="outline" onClick={() => setAllowance((prev) => (parseFloat(prev) + 10).toFixed(2))}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={handleIncreaseAllowance} className="flex-1 bg-primary hover:bg-primary/90">
-                  Approve
-                </Button>
-                <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                  Revoke Approval
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Configure Super Tip */}
+          {/* Super Tip */}
           <Card className="p-6 bg-gradient-card border-border shadow-card">
             <div className="flex items-center gap-2 mb-4">
               <Zap className="h-5 w-5 text-primary" />
@@ -292,78 +340,40 @@ const Settings = () => {
                 <Input
                   id="super-phrase"
                   placeholder="Enter phrase (e.g. CELO)"
-                  value={superTip.phrase}
-                  onChange={(e) => setSuperTip(prev => ({ ...prev, phrase: e.target.value }))}
-                  className="mb-2"
+                  value={localSuperTip.phrase}
+                  onChange={(e) => {
+                    setLocalSuperTip(prev => ({ ...prev, phrase: e.target.value }));
+                    setHasChanges(true);
+                  }}
                 />
-                <p className="text-xs text-muted-foreground">
-                  When you comment or quote with this phrase, it triggers the super tip amount instead of normal tip.
-                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground mb-2 block">Token</Label>
-                  <button
-                    onClick={() => openTokenSelector("super-tip")}
-                    className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:border-primary transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6 bg-primary/10">
-                        <AvatarFallback className="text-xs font-semibold text-primary">
-                          {superTip.token.symbol.slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium text-foreground">{superTip.token.symbol}</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  </button>
+                  <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-background">
+                    <Avatar className="h-6 w-6 bg-primary/10">
+                      <AvatarFallback className="text-xs font-semibold text-primary">
+                        {localSuperTip.token.symbol.slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium">{localSuperTip.token.symbol}</span>
+                  </div>
                 </div>
 
                 <div>
-                  <Label className="text-xs text-muted-foreground mb-2 block">Super Tip Amount</Label>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Amount</Label>
                   <Input
-                    type="text"
-                    value={`$${superTip.amount}`}
-                    readOnly
-                    className="text-center bg-muted border-border"
+                    type="number"
+                    value={localSuperTip.amount}
+                    onChange={(e) => {
+                      setLocalSuperTip(prev => ({ ...prev, amount: e.target.value }));
+                      setHasChanges(true);
+                    }}
+                    className="text-center"
+                    step="0.01"
                   />
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => updateSuperTipAmount(-1)}
-                  className="h-12 flex-1"
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <Input
-                  type="number"
-                  value={superTip.amount}
-                  onChange={(e) => setSuperTip(prev => ({ ...prev, amount: e.target.value }))}
-                  className="text-center h-12 flex-[2]"
-                  step="0.01"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => updateSuperTipAmount(1)}
-                  className="h-12 flex-1"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <p className="text-xs text-muted-foreground">
-                  Example: With phrase "<span className="font-semibold text-foreground">{superTip.phrase || "CELO"}</span>" 
-                  and amount <span className="font-semibold text-foreground">${superTip.amount}</span>, 
-                  when you comment or quote containing this phrase, it will automatically tip the creator 
-                  ${superTip.amount} instead of your normal tip amount.
-                </p>
               </div>
             </div>
           </Card>
@@ -381,54 +391,16 @@ const Settings = () => {
                 <AccordionContent className="text-sm text-muted-foreground">
                   CeloTip automatically tips creators when you interact with their casts on Farcaster. 
                   Simply like, comment, recast, or quote their content, and your configured tip amount 
-                  in cUSD (or your chosen token) will be sent automatically.
+                  will be sent automatically.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-2">
-                <AccordionTrigger className="text-sm">What triggers automatic tips?</AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground">
-                  Tips are triggered by your interactions on Farcaster: liking a cast, commenting, 
-                  recasting, quoting, or following a user. Each interaction type can have its own 
-                  configured amount in cUSD or other Celo tokens.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-3">
-                <AccordionTrigger className="text-sm">How do I configure tip amounts?</AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground">
-                  Use the "Set tipping amount" section above to configure how much you want to tip 
-                  for each interaction type. You can choose different tokens (cUSD, CELO, or custom 
-                  ERC20 tokens on Celo) and set different amounts for likes, comments, recasts, quotes, and follows.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-4">
                 <AccordionTrigger className="text-sm">What is a Super Tip?</AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  Super Tip lets you set a special phrase (like "CELO") and a larger tip amount. 
+                  Super Tip lets you set a special phrase and a larger tip amount. 
                   When you comment or quote a cast containing that phrase, it will automatically 
-                  send the super tip amount instead of your normal tip amount. This is perfect for 
-                  showing extra appreciation to creators!
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-5">
-                <AccordionTrigger className="text-sm">What is programmatic tipping approval?</AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground">
-                  To enable automatic tipping, you need to approve a spending limit for the CeloTip 
-                  smart contract. This allows the contract to automatically send tips on your behalf 
-                  when you interact with casts. You can increase, decrease, or revoke this approval 
-                  at any time.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-6">
-                <AccordionTrigger className="text-sm">Can I use tokens other than cUSD?</AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground">
-                  Yes! CeloTip supports any ERC20 token on the Celo network. You can choose cUSD (stablecoin), 
-                  CELO (native token), or add custom token contracts. All tip displays show values in cUSD 
-                  for consistency, but you can tip with any token you prefer.
+                  send the super tip amount instead of your normal tip amount.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -437,11 +409,6 @@ const Settings = () => {
       </main>
 
       <BottomNav />
-      <TokenSelector
-        open={tokenSelectorOpen}
-        onClose={() => setTokenSelectorOpen(false)}
-        onSelectToken={handleTokenSelect}
-      />
     </div>
   );
 };
