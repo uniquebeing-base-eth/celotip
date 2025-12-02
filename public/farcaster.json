@@ -7,27 +7,26 @@
   "miniapp": {
     "version": "1",
     "name": "CeloTip",
-    "iconUrl": "https://celotip.vercel.app/icon-512.png?v=5",
+    "iconUrl": "https://celotip.vercel.app/icon-512.png?v=6",
     "homeUrl": "https://celotip.vercel.app",
-    "splashImageUrl": "https://celotip.vercel.app/splash.jpg?v=5",
+    "splashImageUrl": "https://celotip.vercel.app/splash.jpg?v=6",
     "splashBackgroundColor": "#35D07F",
     "webhookUrl": "",
     "subtitle": "Automatic Celo tipping",
     "description": "Set tipping rules once and automatically reward Farcaster creators every time you engage.",
     "screenshotUrls": [
-      "https://celotip.vercel.app/og-image.jpg?v=4"
+      "https://celotip.vercel.app/og-image.jpg?v=6"
     ],
     "primaryCategory": "social",
     "tags": ["tipping", "social", "celo", "rewards", "engagement"],
-    "heroImageUrl": "https://celotip.vercel.app/og-image.jpg?v=4",
+    "heroImageUrl": "https://celotip.vercel.app/og-image.jpg?v=6",
     "tagline": "Engage, tip, earn",
     "ogTitle": "CeloTip mini app",
     "ogDescription": "Configure automatic Celo tips for Farcaster likes, comments, recasts, and quotes.",
-    "ogImageUrl": "https://celotip.vercel.app/og-image.jpg?v=4",
+    "ogImageUrl": "https://celotip.vercel.app/og-image.jpg?v=6",
     "noindex": false,
     "requiredChains": ["eip155:42220"],
     "canonicalDomain": "celotip.vercel.app",
     "buttonTitle": "Open CeloTip"
   }
-}
 }
