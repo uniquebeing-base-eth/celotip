@@ -9,31 +9,25 @@
     "name": "CeloTip",
     "iconUrl": "https://celotip.vercel.app/icon-512.png?v=5",
     "homeUrl": "https://celotip.vercel.app",
-    "imageUrl": "https://celotip.vercel.app/og-image.jpg?v=4",
-    "buttonTitle": "Launch CeloTip",
     "splashImageUrl": "https://celotip.vercel.app/splash.jpg?v=5",
     "splashBackgroundColor": "#35D07F",
     "webhookUrl": "",
-    "subtitle": "Engage Tip Earn",
-    "description": "Automatically tip Farcaster creators with CELO tokens based on your interactions",
+    "subtitle": "Automatic Celo tipping",
+    "description": "Set tipping rules once and automatically reward Farcaster creators every time you engage.",
+    "screenshotUrls": [
+      "https://celotip.vercel.app/og-image.jpg?v=4"
+    ],
     "primaryCategory": "social",
-    "tags": ["tipping", "social", "celo", "rewards", "engagement", "blockchain"],
+    "tags": ["tipping", "social", "celo", "rewards", "engagement"],
     "heroImageUrl": "https://celotip.vercel.app/og-image.jpg?v=4",
-    "tagline": "Engage Tip Earn",
-    "ogTitle": "CeloTip - Engage Tip Earn",
-    "ogDescription": "Automatically tip Farcaster creators with CELO tokens. Engage, tip, and earn rewards on every interaction.",
+    "tagline": "Engage, tip, earn",
+    "ogTitle": "CeloTip mini app",
+    "ogDescription": "Configure automatic Celo tips for Farcaster likes, comments, recasts, and quotes.",
     "ogImageUrl": "https://celotip.vercel.app/og-image.jpg?v=4",
-    "castShareUrl": "https://celotip.vercel.app"
-  },
-  "frame": {
-    "version": "1",
-    "name": "CeloTip",
-    "iconUrl": "https://celotip.vercel.app/icon-512.png?v=5",
-    "homeUrl": "https://celotip.vercel.app",
-    "imageUrl": "https://celotip.vercel.app/og-image.jpg?v=4",
-    "buttonTitle": "Launch CeloTip",
-    "splashImageUrl": "https://celotip.vercel.app/splash.jpg?v=5",
-    "splashBackgroundColor": "#35D07F",
-    "webhookUrl": ""
+    "noindex": false,
+    "requiredChains": ["eip155:42220"],
+    "canonicalDomain": "celotip.vercel.app",
+    "buttonTitle": "Open CeloTip"
   }
+}
 }
