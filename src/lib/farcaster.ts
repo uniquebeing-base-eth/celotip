@@ -15,6 +15,15 @@ export const initializeFarcasterSDK = async () => {
 
     const context = await sdk.context;
     console.log("Farcaster SDK initialized with context:", context);
+
+    try {
+      // Prompt the user to add the CeloTip Mini App in compatible Farcaster clients
+      await sdk.actions.addMiniApp();
+      console.log("Farcaster addMiniApp action called");
+    } catch (addError) {
+      console.warn("addMiniApp action not available or failed:", addError);
+    }
+
     isSDKInitialized = true;
     return context;
   } catch (error) {
