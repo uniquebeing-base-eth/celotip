@@ -7,11 +7,11 @@
   "frame": {
     "version": "1",
     "name": "CeloTip",
-    "iconUrl": "https://celotip.vercel.app/icon-512.png?v=3",
+    "iconUrl": "https://celotip.vercel.app/icon-512.png?v=4",
     "homeUrl": "https://celotip.vercel.app",
     "imageUrl": "https://celotip.vercel.app/og-image.jpg?v=3",
     "buttonTitle": "Start CeloTippin",
-    "splashImageUrl": "https://celotip.vercel.app/splash.jpg?v=3",
+    "splashImageUrl": "https://celotip.vercel.app/splash.jpg?v=4",
     "splashBackgroundColor": "#35D07F",
     "webhookUrl": ""
   }
