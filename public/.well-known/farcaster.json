@@ -14,7 +14,6 @@
     "buttonTitle": "Launch CeloTip",
     "splashImageUrl": "https://celotip.vercel.app/splash.png",
     "splashBackgroundColor": "#35D07F",
-    "webhookUrl": "",
     "subtitle": "Auto tip creators on Celo",
     "description": "Set rules and auto reward creators you engage",
     "primaryCategory": "social",
