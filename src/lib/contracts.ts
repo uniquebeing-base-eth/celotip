@@ -1,6 +1,8 @@
 // CeloTip Smart Contract Configuration
-// TODO: Replace with actual deployed contract address on Celo mainnet
-export const CELOTIP_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
+export const CELOTIP_CONTRACT_ADDRESS = "0x6b3A9c2b4b4BB24D5DFa59132499cb4Fd29C733e" as const;
+
+// Relayer wallet address (executes tips on behalf of users)
+export const RELAYER_ADDRESS = "0xc6340F29b11F450877741a2f61A04D31Cb44d9B1" as const;
 
 // Standard ERC-20 token addresses on Celo
 export const TOKEN_ADDRESSES = {
