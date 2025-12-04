@@ -56,6 +56,12 @@ interface TipRequest {
   toFid: number;
   interactionType: string;
   castHash?: string;
+  useSuperTip?: boolean;
+  superTipConfig?: {
+    amount: number;
+    token_address: string;
+    token_symbol: string;
+  };
 }
 
 serve(async (req) => {
@@ -74,9 +80,9 @@ serve(async (req) => {
       throw new Error('RELAYER_PRIVATE_KEY not configured');
     }
 
-    const { fromFid, toFid, interactionType, castHash }: TipRequest = await req.json();
+    const { fromFid, toFid, interactionType, castHash, useSuperTip, superTipConfig }: TipRequest = await req.json();
 
-    console.log("Processing tip request:", { fromFid, toFid, interactionType, castHash });
+    console.log("Processing tip request:", { fromFid, toFid, interactionType, castHash, useSuperTip });
 
     // Fetch sender's profile to get wallet address
     const { data: fromProfile, error: fromError } = await supabase
@@ -113,28 +119,44 @@ serve(async (req) => {
 
     console.log("Addresses resolved:", { fromAddress, toAddress });
 
-    // Fetch tip configuration for the user
-    const { data: tipConfig, error: configError } = await supabase
-      .from('tip_configs')
-      .select('*')
-      .eq('fid', fromFid)
-      .eq('interaction_type', interactionType)
-      .eq('is_enabled', true)
-      .maybeSingle();
+    // Determine which config to use (super tip or regular)
+    let tipAmount: number;
+    let tokenAddress: string;
+    let tokenSymbol: string;
 
-    if (configError) {
-      throw new Error(`Config fetch error: ${configError.message}`);
+    if (useSuperTip && superTipConfig) {
+      // Use super tip configuration
+      console.log("Using super tip config:", superTipConfig);
+      tipAmount = superTipConfig.amount;
+      tokenAddress = superTipConfig.token_address;
+      tokenSymbol = superTipConfig.token_symbol;
+    } else {
+      // Fetch regular tip configuration for the user
+      const { data: tipConfig, error: configError } = await supabase
+        .from('tip_configs')
+        .select('*')
+        .eq('fid', fromFid)
+        .eq('interaction_type', interactionType)
+        .eq('is_enabled', true)
+        .maybeSingle();
+
+      if (configError) {
+        throw new Error(`Config fetch error: ${configError.message}`);
+      }
+
+      if (!tipConfig) {
+        console.log("No tip configuration found for this interaction type");
+        return new Response(
+          JSON.stringify({ success: false, message: 'No tip configuration found' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log("Tip config found:", tipConfig);
+      tipAmount = tipConfig.amount;
+      tokenAddress = tipConfig.token_address;
+      tokenSymbol = tipConfig.token_symbol;
     }
-
-    if (!tipConfig) {
-      console.log("No tip configuration found for this interaction type");
-      return new Response(
-        JSON.stringify({ success: false, message: 'No tip configuration found' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log("Tip config found:", tipConfig);
 
     // Create viem clients
     const publicClient = createPublicClient({
@@ -144,19 +166,19 @@ serve(async (req) => {
 
     // Get token decimals
     const decimals = await publicClient.readContract({
-      address: tipConfig.token_address as `0x${string}`,
+      address: tokenAddress as `0x${string}`,
       abi: ERC20_ABI,
       functionName: 'decimals',
     });
 
-    const amountInWei = parseUnits(tipConfig.amount.toString(), decimals);
+    const amountInWei = parseUnits(tipAmount.toString(), decimals);
 
     // Check on-chain allowance from the CeloTip contract
     const onChainAllowance = await publicClient.readContract({
       address: CELOTIP_CONTRACT_ADDRESS as `0x${string}`,
       abi: CELOTIP_ABI,
       functionName: 'getUserAllowance',
-      args: [fromAddress, tipConfig.token_address as `0x${string}`],
+      args: [fromAddress, tokenAddress as `0x${string}`],
     });
 
     console.log("On-chain allowance:", formatUnits(onChainAllowance, decimals));
@@ -175,9 +197,9 @@ serve(async (req) => {
       .insert({
         from_fid: fromFid,
         to_fid: toFid,
-        amount: tipConfig.amount,
-        token_address: tipConfig.token_address,
-        token_symbol: tipConfig.token_symbol,
+        amount: tipAmount,
+        token_address: tokenAddress,
+        token_symbol: tokenSymbol,
         interaction_type: interactionType,
         cast_hash: castHash || null,
         status: 'pending',
@@ -210,7 +232,7 @@ serve(async (req) => {
         args: [
           fromAddress,
           toAddress,
-          tipConfig.token_address as `0x${string}`,
+          tokenAddress as `0x${string}`,
           amountInWei,
           interactionType,
           castHash || ''
