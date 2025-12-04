@@ -5,8 +5,10 @@ import { Trophy, TrendingUp } from "lucide-react";
 interface LeaderboardUser {
   rank: number;
   username: string;
+  displayName?: string;
+  pfpUrl?: string;
   amount: number;
-  casts?: number;
+  tipCount?: number;
 }
 
 interface LeaderboardItemProps {
@@ -41,16 +43,19 @@ export const LeaderboardItem = ({ user }: LeaderboardItemProps) => {
         </div>
 
         <Avatar className={`h-12 w-12 border-2 ${isTopThree ? 'border-primary' : 'border-border'} shadow-sm`}>
-          <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
+          <AvatarImage src={user.pfpUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
           <AvatarFallback className="bg-secondary text-secondary-foreground">
             {user.username.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground truncate">@{user.username}</h3>
-          {user.casts && (
-            <p className="text-xs text-muted-foreground">{user.casts} casts</p>
+          <h3 className="font-semibold text-foreground truncate">
+            {user.displayName || `@${user.username}`}
+          </h3>
+          <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
+          {user.tipCount && (
+            <p className="text-xs text-muted-foreground">{user.tipCount} tips</p>
           )}
         </div>
 
