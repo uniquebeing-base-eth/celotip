@@ -68,7 +68,7 @@ async function sendTipNotification(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'api_key': neynarApiKey,
+        'x-api-key': neynarApiKey,
       },
       body: JSON.stringify({
         target_fids: [recipientFid],
@@ -79,6 +79,8 @@ async function sendTipNotification(
         },
       }),
     });
+
+    console.log("Notification API response status:", response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
