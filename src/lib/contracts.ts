@@ -40,5 +40,209 @@ export const ERC20_ABI = [
     name: "balanceOf",
     outputs: [{ name: "balance", type: "uint256" }],
     type: "function"
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: "decimals",
+    outputs: [{ name: "", type: "uint8" }],
+    type: "function"
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: "symbol",
+    outputs: [{ name: "", type: "string" }],
+    type: "function"
+  }
+] as const;
+
+// CeloTip Contract ABI
+export const CELOTIP_ABI = [
+  {
+    inputs: [{ name: "_relayer", type: "address" }],
+    stateMutability: "nonpayable",
+    type: "constructor"
+  },
+  {
+    inputs: [{ name: "owner", type: "address" }],
+    name: "OwnableInvalidOwner",
+    type: "error"
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "OwnableUnauthorizedAccount",
+    type: "error"
+  },
+  { inputs: [], name: "EnforcedPause", type: "error" },
+  { inputs: [], name: "ExpectedPause", type: "error" },
+  { inputs: [], name: "ReentrancyGuardReentrantCall", type: "error" },
+  { inputs: [], name: "InsufficientAllowance", type: "error" },
+  { inputs: [], name: "InvalidAddress", type: "error" },
+  { inputs: [], name: "InvalidAmount", type: "error" },
+  { inputs: [], name: "SelfTipNotAllowed", type: "error" },
+  { inputs: [], name: "UnauthorizedRelayer", type: "error" },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "previousOwner", type: "address" },
+      { indexed: true, name: "newOwner", type: "address" }
+    ],
+    name: "OwnershipTransferred",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: false, name: "account", type: "address" }],
+    name: "Paused",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "oldRelayer", type: "address" },
+      { indexed: true, name: "newRelayer", type: "address" }
+    ],
+    name: "RelayerUpdated",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "from", type: "address" },
+      { indexed: true, name: "to", type: "address" },
+      { indexed: true, name: "tokenAddress", type: "address" },
+      { indexed: false, name: "amount", type: "uint256" },
+      { indexed: false, name: "interactionType", type: "string" },
+      { indexed: false, name: "castHash", type: "string" }
+    ],
+    name: "TipSent",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "user", type: "address" },
+      { indexed: true, name: "tokenAddress", type: "address" }
+    ],
+    name: "TokensRevoked",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: false, name: "account", type: "address" }],
+    name: "Unpaused",
+    type: "event"
+  },
+  {
+    inputs: [
+      { name: "tokenAddress", type: "address" },
+      { name: "amount", type: "uint256" }
+    ],
+    name: "emergencyWithdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "tokenAddress", type: "address" }
+    ],
+    name: "getUserAllowance",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "owner",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "pause",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "paused",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "relayer",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "renounceOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [{ name: "tokenAddress", type: "address" }],
+    name: "revokeApproval",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      { name: "froms", type: "address[]" },
+      { name: "tos", type: "address[]" },
+      { name: "tokenAddresses", type: "address[]" },
+      { name: "amounts", type: "uint256[]" },
+      { name: "interactionTypes", type: "string[]" },
+      { name: "castHashes", type: "string[]" }
+    ],
+    name: "sendBatchTips",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "tokenAddress", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "interactionType", type: "string" },
+      { name: "castHash", type: "string" }
+    ],
+    name: "sendTip",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [{ name: "newOwner", type: "address" }],
+    name: "transferOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "unpause",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [{ name: "newRelayer", type: "address" }],
+    name: "updateRelayer",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
   }
 ] as const;

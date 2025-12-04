@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { X } from "lucide-react";
+import { TOKEN_ADDRESSES } from "@/lib/contracts";
 
 interface Token {
   symbol: string;
@@ -13,40 +14,54 @@ interface Token {
 }
 
 const DEFAULT_TOKENS: Token[] = [
-  { symbol: "CELO", name: "Celo Native", address: "0x471EcE3750Da237f93B8E339c536989b8978a438", balance: "$92.20" },
-  { symbol: "cUSD", name: "Celo Dollar", address: "0x765DE816845861e75A25fCA122bb6898B8B1282a", balance: "$45.50" },
+  { symbol: "cUSD", name: "Celo Dollar", address: TOKEN_ADDRESSES.cUSD, balance: "$0.00" },
+  { symbol: "CELO", name: "Celo", address: TOKEN_ADDRESSES.CELO, balance: "$0.00" },
+  { symbol: "cEUR", name: "Celo Euro", address: TOKEN_ADDRESSES.cEUR, balance: "$0.00" },
+  { symbol: "cREAL", name: "Celo Real", address: TOKEN_ADDRESSES.cREAL, balance: "$0.00" },
 ];
 
-interface TokenSelectorProps {
+export interface TokenSelectorProps {
   open: boolean;
   onClose: () => void;
   onSelectToken: (token: Token) => void;
   selectedToken?: Token;
+  tokens?: Token[];
 }
 
-export const TokenSelector = ({ open, onClose, onSelectToken, selectedToken }: TokenSelectorProps) => {
-  const [tokens, setTokens] = useState<Token[]>(DEFAULT_TOKENS);
+export const TokenSelector = ({ 
+  open, 
+  onClose, 
+  onSelectToken, 
+  selectedToken,
+  tokens: propTokens 
+}: TokenSelectorProps) => {
+  const [customTokens, setCustomTokens] = useState<Token[]>([]);
   const [newTokenAddress, setNewTokenAddress] = useState("");
 
+  const allTokens = [...(propTokens || DEFAULT_TOKENS), ...customTokens];
+
   const handleAddToken = () => {
-    if (newTokenAddress.trim()) {
-      const newToken: Token = {
-        symbol: "CUSTOM",
-        name: "Custom Token",
-        address: newTokenAddress,
-        balance: "$0",
-      };
-      setTokens([...tokens, newToken]);
+    if (newTokenAddress.trim() && newTokenAddress.startsWith("0x")) {
+      const exists = allTokens.some(t => t.address.toLowerCase() === newTokenAddress.toLowerCase());
+      if (!exists) {
+        const newToken: Token = {
+          symbol: "CUSTOM",
+          name: "Custom Token",
+          address: newTokenAddress,
+          balance: "$0.00",
+        };
+        setCustomTokens([...customTokens, newToken]);
+      }
       setNewTokenAddress("");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-foreground">Choose from Holdings</DialogTitle>
+            <DialogTitle className="text-foreground">Choose Token</DialogTitle>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -55,14 +70,14 @@ export const TokenSelector = ({ open, onClose, onSelectToken, selectedToken }: T
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            You must hold more than $5 of a token to configure tipping
+            Select a token to use for tipping
           </p>
 
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Add new token</label>
+            <label className="text-sm text-muted-foreground mb-2 block">Add custom token</label>
             <div className="flex gap-2">
               <Input
-                placeholder="Add address"
+                placeholder="Token contract address (0x...)"
                 value={newTokenAddress}
                 onChange={(e) => setNewTokenAddress(e.target.value)}
                 className="flex-1"
@@ -74,9 +89,9 @@ export const TokenSelector = ({ open, onClose, onSelectToken, selectedToken }: T
           </div>
 
           <div>
-            <label className="text-sm text-muted-foreground mb-3 block">Your holdings</label>
-            <div className="space-y-2">
-              {tokens.map((token) => (
+            <label className="text-sm text-muted-foreground mb-3 block">Available tokens</label>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {allTokens.map((token) => (
                 <button
                   key={token.address}
                   onClick={() => {
@@ -84,7 +99,9 @@ export const TokenSelector = ({ open, onClose, onSelectToken, selectedToken }: T
                     onClose();
                   }}
                   className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all hover:border-primary ${
-                    selectedToken?.address === token.address ? "border-primary bg-primary/5" : "border-border"
+                    selectedToken?.address?.toLowerCase() === token.address.toLowerCase() 
+                      ? "border-primary bg-primary/5" 
+                      : "border-border"
                   }`}
                 >
                   <div className="flex items-center gap-3">
