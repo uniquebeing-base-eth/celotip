@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title CeloTip
@@ -50,7 +50,7 @@ contract CeloTip is Ownable, ReentrancyGuard, Pausable {
      * @notice Constructor sets the relayer address
      * @param _relayer Address authorized to execute tips
      */
-    constructor(address _relayer) {
+    constructor(address _relayer) Ownable(msg.sender) {
         if (_relayer == address(0)) revert InvalidAddress();
         relayer = _relayer;
     }
@@ -126,30 +126,31 @@ contract CeloTip is Ownable, ReentrancyGuard, Pausable {
         );
 
         for (uint256 i = 0; i < length; i++) {
-            if (froms[i] == address(0) || tos[i] == address(0) || tokenAddresses[i] == address(0)) {
-                continue; // Skip invalid addresses
-            }
-            if (amounts[i] == 0 || froms[i] == tos[i]) {
-                continue; // Skip invalid amounts or self-tips
+            if (
+                froms[i] == address(0) ||
+                tos[i] == address(0) ||
+                tokenAddresses[i] == address(0) ||
+                amounts[i] == 0 ||
+                froms[i] == tos[i]
+            ) {
+                continue; // Skip invalid entries
             }
 
             IERC20 token = IERC20(tokenAddresses[i]);
             uint256 allowance = token.allowance(froms[i], address(this));
             
             if (allowance >= amounts[i]) {
-                try token.safeTransferFrom(froms[i], tos[i], amounts[i]) {
-                    emit TipSent(
-                        froms[i],
-                        tos[i],
-                        tokenAddresses[i],
-                        amounts[i],
-                        interactionTypes[i],
-                        castHashes[i]
-                    );
-                } catch {
-                    // Silently continue on failure to not block other tips
-                    continue;
-                }
+                // safeTransferFrom will revert on failure (no need for try-catch)
+                token.safeTransferFrom(froms[i], tos[i], amounts[i]);
+                
+                emit TipSent(
+                    froms[i],
+                    tos[i],
+                    tokenAddresses[i],
+                    amounts[i],
+                    interactionTypes[i],
+                    castHashes[i]
+                );
             }
         }
     }
