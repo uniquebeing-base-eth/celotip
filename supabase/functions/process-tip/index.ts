@@ -266,6 +266,8 @@ serve(async (req) => {
           JSON.stringify({ 
             success: true, 
             txHash,
+            amount: tipAmount,
+            tokenSymbol: tokenSymbol,
             transaction: { ...transaction, status: 'completed', tx_hash: txHash }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
