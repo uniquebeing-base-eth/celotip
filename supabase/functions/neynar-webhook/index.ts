@@ -10,60 +10,10 @@ const corsHeaders = {
 // Neynar webhook event types that trigger tips
 const TIP_TRIGGER_EVENTS = ['cast.created', 'reaction.created', 'follow.created'];
 
-interface NeynarWebhookPayload {
-  type: string;
-  data: {
-    // For cast.created (comments/quotes)
-    hash?: string;
-    text?: string;
-    author?: {
-      fid: number;
-      username: string;
-      display_name?: string;
-      pfp_url?: string;
-    };
-    parent_hash?: string;
-    parent_author?: {
-      fid: number;
-    };
-    // For reaction.created (likes, recasts)
-    reaction_type?: string; // 'like' or 'recast'
-    user?: {
-      fid: number;
-      username: string;
-      display_name?: string;
-      pfp_url?: string;
-    };
-    cast?: {
-      hash: string;
-      author: {
-        fid: number;
-        username: string;
-        display_name?: string;
-        pfp_url?: string;
-      };
-    };
-    // For follow.created
-    follower?: {
-      fid: number;
-      username: string;
-      display_name?: string;
-      pfp_url?: string;
-    };
-    following?: {
-      fid: number;
-      username: string;
-      display_name?: string;
-      pfp_url?: string;
-    };
-  };
-}
-
 // Verify Neynar webhook signature
 async function verifySignature(body: string, signature: string | null): Promise<boolean> {
   const webhookSecret = Deno.env.get('NEYNAR_WEBHOOK_SECRET');
   
-  // For debugging - log what we receive
   console.log("Webhook signature received:", signature ? signature.substring(0, 20) + "..." : "none");
   console.log("Webhook secret configured:", webhookSecret ? "yes" : "no");
   
@@ -74,7 +24,7 @@ async function verifySignature(body: string, signature: string | null): Promise<
   
   if (!signature) {
     console.warn("No signature provided, allowing request for testing");
-    return true; // Allow for debugging
+    return true;
   }
   
   try {
@@ -86,7 +36,7 @@ async function verifySignature(body: string, signature: string | null): Promise<
     return isValid || true; // Temporarily allow all for debugging
   } catch (error) {
     console.error("Error verifying signature:", error);
-    return true; // Allow for debugging
+    return true;
   }
 }
 
@@ -147,11 +97,9 @@ serve(async (req) => {
   }
 
   try {
-    // Get raw body for signature verification
     const bodyText = await req.text();
     const signature = req.headers.get('x-neynar-signature');
     
-    // Verify webhook signature
     const isValid = await verifySignature(bodyText, signature);
     if (!isValid) {
       console.error("Invalid webhook signature");
@@ -166,7 +114,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const payload: NeynarWebhookPayload = JSON.parse(bodyText);
+    const payload = JSON.parse(bodyText);
     console.log("Neynar webhook received:", JSON.stringify(payload, null, 2));
 
     const { type, data } = payload;
@@ -186,34 +134,49 @@ serve(async (req) => {
     let castText: string | undefined;
     let senderUsername: string | undefined;
 
-    // Parse event type and extract relevant data
+    // Parse event type and extract relevant data based on ACTUAL Neynar payload structure
     if (type === 'reaction.created') {
+      // data.user = the person who reacted (tipper)
+      // data.target.author = the cast author (recipient)
+      // data.reaction_type = 1 for like, 2 for recast (NUMBER, not string!)
       fromFid = data.user?.fid;
-      toFid = data.cast?.author?.fid;
-      castHash = data.cast?.hash;
+      toFid = data.target?.author?.fid;
+      castHash = data.target?.hash;
       senderUsername = data.user?.username;
       
-      if (data.reaction_type === 'like') {
+      // reaction_type is a NUMBER: 1 = like, 2 = recast
+      if (data.reaction_type === 1) {
         interactionType = 'like';
-      } else if (data.reaction_type === 'recast') {
+      } else if (data.reaction_type === 2) {
         interactionType = 'recast';
       }
+      
+      console.log("Reaction parsed:", { fromFid, toFid, interactionType, castHash, reaction_type: data.reaction_type });
+      
     } else if (type === 'cast.created') {
+      // data.author = the person who created the cast
+      // data.parent_author = the author of the parent cast (for replies)
       fromFid = data.author?.fid;
       toFid = data.parent_author?.fid;
       castHash = data.parent_hash;
       castText = data.text;
       senderUsername = data.author?.username;
       
-      // Check if it's a quote or a reply (comment)
       if (data.parent_hash) {
         interactionType = 'comment';
       }
+      
+      console.log("Cast parsed:", { fromFid, toFid, interactionType, castHash });
+      
     } else if (type === 'follow.created') {
-      fromFid = data.follower?.fid;
-      toFid = data.following?.fid;
+      // data.user = the person who followed (tipper)
+      // data.target_user = the person being followed (recipient)
+      fromFid = data.user?.fid;
+      toFid = data.target_user?.fid;
       interactionType = 'follow';
-      senderUsername = data.follower?.username;
+      senderUsername = data.user?.username;
+      
+      console.log("Follow parsed:", { fromFid, toFid, interactionType });
     }
 
     // Validate we have the required data
@@ -236,20 +199,26 @@ serve(async (req) => {
 
     console.log("Processing tip:", { fromFid, toFid, interactionType, castHash, senderUsername });
 
-    // Check if the sender has CeloTip configured
+    // Check if the sender (fromFid) has CeloTip configured - this is the tipper
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('connected_address')
+      .select('connected_address, username')
       .eq('fid', fromFid)
       .maybeSingle();
 
-    if (profileError || !profile?.connected_address) {
-      console.log("Sender not registered in CeloTip:", fromFid);
+    if (profileError) {
+      console.error("Error fetching sender profile:", profileError);
+    }
+
+    if (!profile?.connected_address) {
+      console.log("Sender not registered in CeloTip or has no wallet:", fromFid);
       return new Response(
         JSON.stringify({ success: true, message: 'Sender not registered in CeloTip' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log("Sender profile found:", { fid: fromFid, address: profile.connected_address });
 
     // Check if recipient is registered (we need their wallet)
     let recipientAddress: string | null = null;
@@ -259,8 +228,12 @@ serve(async (req) => {
       .eq('fid', toFid)
       .maybeSingle();
 
+    if (recipientError) {
+      console.error("Error fetching recipient profile:", recipientError);
+    }
+
     // If recipient not registered, try to fetch and store their address via Neynar
-    if (recipientError || !recipientProfile?.connected_address) {
+    if (!recipientProfile?.connected_address) {
       console.log("Recipient not registered in CeloTip, fetching from Neynar...");
       
       const neynarApiKey = Deno.env.get('NEYNAR_API_KEY');
@@ -300,6 +273,8 @@ serve(async (req) => {
                 );
               }
             }
+          } else {
+            console.error("Neynar API error:", await neynarResponse.text());
           }
         } catch (neynarError) {
           console.error("Error fetching recipient from Neynar:", neynarError);
@@ -307,6 +282,15 @@ serve(async (req) => {
       }
     } else {
       recipientAddress = recipientProfile.connected_address;
+      console.log("Recipient already registered with address:", recipientAddress);
+    }
+
+    if (!recipientAddress) {
+      console.log("Could not get recipient wallet address");
+      return new Response(
+        JSON.stringify({ success: true, message: 'Could not get recipient wallet' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Check for super tip if it's a comment or quote
@@ -331,6 +315,8 @@ serve(async (req) => {
     // Call the process-tip function
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    console.log("Calling process-tip with:", { fromFid, toFid, interactionType, castHash, useSuperTip });
     
     const processTipResponse = await fetch(`${supabaseUrl}/functions/v1/process-tip`, {
       method: 'POST',
