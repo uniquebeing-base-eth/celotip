@@ -70,7 +70,9 @@ const AVAILABLE_TOKENS: Token[] = [
 
 const Settings = () => {
   const { walletAddress } = useWallet();
-  const { allowance, approve, isApproving, revoke, isRevoking } = useTokenApproval(TOKEN_ADDRESSES.cUSD, "cUSD");
+  const [approvalToken, setApprovalToken] = useState<Token>(AVAILABLE_TOKENS[0]);
+  const [approvalTokenSelectorOpen, setApprovalTokenSelectorOpen] = useState(false);
+  const { allowance, approve, isApproving, revoke, isRevoking } = useTokenApproval(approvalToken.address, approvalToken.symbol);
   const { tipConfigs: dbTipConfigs, superTipConfig: dbSuperTipConfig, isLoading: isLoadingConfigs, upsertTipConfig, upsertSuperTipConfig } = useTipConfig();
 
   // Fetch real token balances
@@ -164,8 +166,22 @@ const Settings = () => {
 
   const [tokenSelectorOpen, setTokenSelectorOpen] = useState(false);
   const [selectedConfigKey, setSelectedConfigKey] = useState<string | null>(null);
-  const [approvalAmount, setApprovalAmount] = useState("100.00");
+  const [approvalAmount, setApprovalAmount] = useState("10.00");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Get the balance for the approval token
+  const approvalTokenBalance = parseFloat(tokenBalances?.[approvalToken.address] || "0");
+
+  // Handle approval token selection
+  const handleApprovalTokenSelect = (token: Token) => {
+    setApprovalToken(token);
+    // Reset amount to not exceed new token balance
+    const newBalance = parseFloat(tokenBalances?.[token.address] || "0");
+    if (parseFloat(approvalAmount) > newBalance) {
+      setApprovalAmount(newBalance.toFixed(2));
+    }
+    setApprovalTokenSelectorOpen(false);
+  };
 
   const handleTokenSelect = (token: Token) => {
     const tokenWithBalance = getTokenWithBalance(token);
@@ -252,11 +268,32 @@ const Settings = () => {
   };
 
   const handleIncreaseAllowance = async () => {
+    const amount = parseFloat(approvalAmount);
+    
+    // Validate amount doesn't exceed balance
+    if (amount > approvalTokenBalance) {
+      toast({
+        title: "Insufficient Balance",
+        description: `You only have ${approvalTokenBalance.toFixed(2)} ${approvalToken.symbol}. Please enter a lower amount.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (amount <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter an amount greater than 0.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await approve(approvalAmount);
       toast({
         title: "Approval Successful",
-        description: `Approved ${approvalAmount} cUSD for CeloTip smart contract.`,
+        description: `Approved ${approvalAmount} ${approvalToken.symbol} for CeloTip smart contract.`,
       });
     } catch (error: any) {
       toast({
@@ -434,10 +471,33 @@ const Settings = () => {
             </p>
 
             <div className="space-y-4">
+              {/* Token Selector for Approval */}
+              <div>
+                <Label className="text-sm font-medium">Select Token</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Balance: {approvalTokenBalance.toFixed(2)} {approvalToken.symbol}
+                </p>
+                <button
+                  onClick={() => setApprovalTokenSelectorOpen(true)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:border-primary transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6 bg-primary/10">
+                      <AvatarFallback className="text-xs font-semibold text-primary">
+                        {approvalToken.symbol.slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium text-foreground">{approvalToken.symbol}</span>
+                    <span className="text-xs text-muted-foreground">({approvalToken.name})</span>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
               <div>
                 <Label htmlFor="allowance" className="text-sm font-medium">Set spending limit</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Current allowance: {allowance ? parseFloat(allowance).toFixed(2) : "0.00"} cUSD
+                  Current allowance: {allowance ? parseFloat(allowance).toFixed(2) : "0.00"} {approvalToken.symbol}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" onClick={() => setApprovalAmount((prev) => Math.max(0, parseFloat(prev) - 10).toFixed(2))}>
@@ -448,20 +508,39 @@ const Settings = () => {
                     type="number"
                     step="10"
                     value={approvalAmount}
-                    onChange={(e) => setApprovalAmount(e.target.value)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (val > approvalTokenBalance) {
+                        setApprovalAmount(approvalTokenBalance.toFixed(2));
+                      } else {
+                        setApprovalAmount(e.target.value);
+                      }
+                    }}
+                    max={approvalTokenBalance}
                     className="flex-1 text-center"
                   />
-                  <Button variant="outline" onClick={() => setApprovalAmount((prev) => (parseFloat(prev) + 10).toFixed(2))}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setApprovalAmount((prev) => {
+                      const newVal = parseFloat(prev) + 10;
+                      return Math.min(newVal, approvalTokenBalance).toFixed(2);
+                    })}
+                  >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
+                {parseFloat(approvalAmount) > approvalTokenBalance && (
+                  <p className="text-xs text-destructive mt-1">
+                    Amount exceeds your balance of {approvalTokenBalance.toFixed(2)} {approvalToken.symbol}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2">
                 <Button 
                   onClick={handleIncreaseAllowance} 
                   className="flex-1 bg-primary hover:bg-primary/90"
-                  disabled={isApproving || isRevoking}
+                  disabled={isApproving || isRevoking || parseFloat(approvalAmount) > approvalTokenBalance || parseFloat(approvalAmount) <= 0}
                 >
                   {isApproving ? (
                     <>
@@ -647,6 +726,14 @@ const Settings = () => {
         onClose={() => setTokenSelectorOpen(false)}
         onSelectToken={handleTokenSelect}
         selectedToken={selectedConfigKey ? (selectedConfigKey === "super-tip" ? superTip.token : localTipConfigs[selectedConfigKey]?.token) : undefined}
+        tokens={AVAILABLE_TOKENS.map(getTokenWithBalance)}
+      />
+
+      <TokenSelector
+        open={approvalTokenSelectorOpen}
+        onClose={() => setApprovalTokenSelectorOpen(false)}
+        onSelectToken={handleApprovalTokenSelect}
+        selectedToken={approvalToken}
         tokens={AVAILABLE_TOKENS.map(getTokenWithBalance)}
       />
 
