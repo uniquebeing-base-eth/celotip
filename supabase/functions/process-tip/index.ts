@@ -1,10 +1,55 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createPublicClient, createWalletClient, http, parseUnits, formatUnits } from "https://esm.sh/viem@2.40.3";
+import { privateKeyToAccount } from "https://esm.sh/viem@2.40.3/accounts";
+import { celo } from "https://esm.sh/viem@2.40.3/chains";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Contract addresses
+const CELOTIP_CONTRACT_ADDRESS = "0x6b3A9c2b4b4BB24D5DFa59132499cb4Fd29C733e";
+
+// CeloTip Contract ABI (only sendTip function needed)
+const CELOTIP_ABI = [
+  {
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "tokenAddress", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "interactionType", type: "string" },
+      { name: "castHash", type: "string" }
+    ],
+    name: "sendTip",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "tokenAddress", type: "address" }
+    ],
+    name: "getUserAllowance",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function"
+  }
+] as const;
+
+// ERC20 ABI for decimals
+const ERC20_ABI = [
+  {
+    inputs: [],
+    name: "decimals",
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+    type: "function"
+  }
+] as const;
 
 interface TipRequest {
   fromFid: number;
@@ -24,9 +69,49 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const relayerPrivateKey = Deno.env.get('RELAYER_PRIVATE_KEY');
+    if (!relayerPrivateKey) {
+      throw new Error('RELAYER_PRIVATE_KEY not configured');
+    }
+
     const { fromFid, toFid, interactionType, castHash }: TipRequest = await req.json();
 
-    console.log("Processing tip:", { fromFid, toFid, interactionType, castHash });
+    console.log("Processing tip request:", { fromFid, toFid, interactionType, castHash });
+
+    // Fetch sender's profile to get wallet address
+    const { data: fromProfile, error: fromError } = await supabase
+      .from('profiles')
+      .select('connected_address')
+      .eq('fid', fromFid)
+      .maybeSingle();
+
+    if (fromError || !fromProfile?.connected_address) {
+      console.error("Sender profile not found:", fromError);
+      return new Response(
+        JSON.stringify({ success: false, message: 'Sender wallet address not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch recipient's profile to get wallet address
+    const { data: toProfile, error: toError } = await supabase
+      .from('profiles')
+      .select('connected_address')
+      .eq('fid', toFid)
+      .maybeSingle();
+
+    if (toError || !toProfile?.connected_address) {
+      console.error("Recipient profile not found:", toError);
+      return new Response(
+        JSON.stringify({ success: false, message: 'Recipient wallet address not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const fromAddress = fromProfile.connected_address as `0x${string}`;
+    const toAddress = toProfile.connected_address as `0x${string}`;
+
+    console.log("Addresses resolved:", { fromAddress, toAddress });
 
     // Fetch tip configuration for the user
     const { data: tipConfig, error: configError } = await supabase
@@ -42,36 +127,50 @@ serve(async (req) => {
     }
 
     if (!tipConfig) {
+      console.log("No tip configuration found for this interaction type");
       return new Response(
         JSON.stringify({ success: false, message: 'No tip configuration found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check token approval
-    const { data: approval, error: approvalError } = await supabase
-      .from('token_approvals')
-      .select('*')
-      .eq('fid', fromFid)
-      .eq('token_address', tipConfig.token_address)
-      .maybeSingle();
+    console.log("Tip config found:", tipConfig);
 
-    if (approvalError) {
-      throw new Error(`Approval fetch error: ${approvalError.message}`);
-    }
+    // Create viem clients
+    const publicClient = createPublicClient({
+      chain: celo,
+      transport: http(),
+    });
 
-    if (!approval || approval.spent_amount + tipConfig.amount > approval.approved_amount) {
+    // Get token decimals
+    const decimals = await publicClient.readContract({
+      address: tipConfig.token_address as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'decimals',
+    });
+
+    const amountInWei = parseUnits(tipConfig.amount.toString(), decimals);
+
+    // Check on-chain allowance from the CeloTip contract
+    const onChainAllowance = await publicClient.readContract({
+      address: CELOTIP_CONTRACT_ADDRESS as `0x${string}`,
+      abi: CELOTIP_ABI,
+      functionName: 'getUserAllowance',
+      args: [fromAddress, tipConfig.token_address as `0x${string}`],
+    });
+
+    console.log("On-chain allowance:", formatUnits(onChainAllowance, decimals));
+
+    if (onChainAllowance < amountInWei) {
+      console.log("Insufficient on-chain allowance");
       return new Response(
-        JSON.stringify({ success: false, message: 'Insufficient allowance' }),
+        JSON.stringify({ success: false, message: 'Insufficient token allowance. Please approve more tokens.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // TODO: Execute blockchain transaction via smart contract
-    // This would call the CeloTip smart contract to transfer tokens
-    // For now, we'll create a pending transaction record
-    
-    const { data: transaction, error: txError } = await supabase
+    // Create transaction record first
+    const { data: transaction, error: txInsertError } = await supabase
       .from('transactions')
       .insert({
         from_fid: fromFid,
@@ -80,30 +179,101 @@ serve(async (req) => {
         token_address: tipConfig.token_address,
         token_symbol: tipConfig.token_symbol,
         interaction_type: interactionType,
-        cast_hash: castHash,
+        cast_hash: castHash || null,
         status: 'pending',
       })
       .select()
       .single();
 
-    if (txError) {
-      throw new Error(`Transaction insert error: ${txError.message}`);
+    if (txInsertError) {
+      throw new Error(`Transaction insert error: ${txInsertError.message}`);
     }
 
-    // Update spent amount
-    await supabase
-      .from('token_approvals')
-      .update({
-        spent_amount: approval.spent_amount + tipConfig.amount,
-      })
-      .eq('id', approval.id);
+    console.log("Transaction record created:", transaction.id);
 
-    console.log("Tip processed successfully:", transaction);
+    // Execute on-chain transaction
+    try {
+      const account = privateKeyToAccount(`0x${relayerPrivateKey}` as `0x${string}`);
+      
+      const walletClient = createWalletClient({
+        account,
+        chain: celo,
+        transport: http(),
+      });
 
-    return new Response(
-      JSON.stringify({ success: true, transaction }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      console.log("Executing sendTip on contract...");
+
+      const txHash = await walletClient.writeContract({
+        address: CELOTIP_CONTRACT_ADDRESS as `0x${string}`,
+        abi: CELOTIP_ABI,
+        functionName: 'sendTip',
+        args: [
+          fromAddress,
+          toAddress,
+          tipConfig.token_address as `0x${string}`,
+          amountInWei,
+          interactionType,
+          castHash || ''
+        ],
+      });
+
+      console.log("Transaction submitted:", txHash);
+
+      // Wait for confirmation
+      const receipt = await publicClient.waitForTransactionReceipt({ 
+        hash: txHash,
+        confirmations: 1,
+      });
+
+      console.log("Transaction confirmed:", receipt.status);
+
+      if (receipt.status === 'success') {
+        // Update transaction record with success
+        await supabase
+          .from('transactions')
+          .update({
+            status: 'completed',
+            tx_hash: txHash,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', transaction.id);
+
+        console.log("Tip sent successfully!");
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            txHash,
+            transaction: { ...transaction, status: 'completed', tx_hash: txHash }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        throw new Error('Transaction reverted');
+      }
+
+    } catch (txError: any) {
+      console.error("Transaction execution failed:", txError);
+
+      // Update transaction record with failure
+      await supabase
+        .from('transactions')
+        .update({
+          status: 'failed',
+          error_message: txError.message || 'Transaction failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', transaction.id);
+
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: `Transaction failed: ${txError.message}`,
+          transaction: { ...transaction, status: 'failed' }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
   } catch (error: any) {
     console.error("Error processing tip:", error);
