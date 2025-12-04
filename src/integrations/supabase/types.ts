@@ -144,6 +144,7 @@ export type Database = {
           id: string
           spent_amount: number
           token_address: string
+          token_symbol: string | null
           tx_hash: string | null
           updated_at: string
         }
@@ -155,6 +156,7 @@ export type Database = {
           id?: string
           spent_amount?: number
           token_address: string
+          token_symbol?: string | null
           tx_hash?: string | null
           updated_at?: string
         }
@@ -166,6 +168,7 @@ export type Database = {
           id?: string
           spent_amount?: number
           token_address?: string
+          token_symbol?: string | null
           tx_hash?: string | null
           updated_at?: string
         }
