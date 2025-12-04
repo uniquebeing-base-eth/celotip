@@ -7,5 +7,3 @@ import { initializeFarcasterSDK } from "./lib/farcaster";
 initializeFarcasterSDK().catch(console.error);
 
 createRoot(document.getElementById("root")!).render(<App />);
-
-

@@ -246,5 +246,3 @@ export const CELOTIP_ABI = [
     type: "function"
   }
 ] as const;
-
-  

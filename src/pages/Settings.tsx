@@ -304,8 +304,6 @@ const Settings = () => {
     }
   };
 
-
-    
   const handleRevokeApproval = async () => {
     try {
       await revoke();

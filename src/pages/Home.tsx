@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
-
 interface TrendingCast {
   id: string;
   cast_hash: string;
@@ -44,10 +43,8 @@ const Home = () => {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      
       if (error) throw error;
 
-      
       // Aggregate by cast_hash
       const castMap = new Map<string, {
         cast_hash: string;
