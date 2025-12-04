@@ -70,6 +70,30 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
       // Create wallet client using Farcaster Frame SDK
       const provider = await sdk.wallet.ethProvider;
       
+      // Switch to Celo chain first
+      try {
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xa4ec" }], // 42220 in hex
+        });
+      } catch (switchError: any) {
+        // Chain not added, try to add it
+        if (switchError.code === 4902) {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: "0xa4ec",
+              chainName: "Celo",
+              nativeCurrency: { name: "CELO", symbol: "CELO", decimals: 18 },
+              rpcUrls: ["https://forno.celo.org"],
+              blockExplorerUrls: ["https://celoscan.io"],
+            }],
+          });
+        } else {
+          throw switchError;
+        }
+      }
+      
       const walletClient = createWalletClient({
         chain: celo,
         transport: custom(provider),
@@ -120,6 +144,30 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
       if (!user || !walletAddress) throw new Error("User not authenticated");
 
       const provider = await sdk.wallet.ethProvider;
+      
+      // Switch to Celo chain first
+      try {
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xa4ec" }], // 42220 in hex
+        });
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: "0xa4ec",
+              chainName: "Celo",
+              nativeCurrency: { name: "CELO", symbol: "CELO", decimals: 18 },
+              rpcUrls: ["https://forno.celo.org"],
+              blockExplorerUrls: ["https://celoscan.io"],
+            }],
+          });
+        } else {
+          throw switchError;
+        }
+      }
+      
       const walletClient = createWalletClient({
         chain: celo,
         transport: custom(provider),
