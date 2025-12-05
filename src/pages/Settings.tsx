@@ -166,6 +166,7 @@ const Settings = () => {
 
   const [tokenSelectorOpen, setTokenSelectorOpen] = useState(false);
   const [selectedConfigKey, setSelectedConfigKey] = useState<string | null>(null);
+  const [isSavingSuperTip, setIsSavingSuperTip] = useState(false);
   const [approvalAmount, setApprovalAmount] = useState("10.00");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -241,20 +242,9 @@ const Settings = () => {
         });
       }
 
-      // Save super tip config
-      if (superTip.phrase) {
-        await upsertSuperTipConfig.mutateAsync({
-          trigger_phrase: superTip.phrase,
-          token_address: superTip.token.address,
-          token_symbol: superTip.token.symbol,
-          amount: parseFloat(superTip.amount),
-          is_enabled: true,
-        });
-      }
-
       toast({
         title: "Settings Saved",
-        description: "Your tipping preferences have been saved to the blockchain.",
+        description: "Your tipping preferences have been saved.",
       });
     } catch (error: any) {
       toast({
@@ -264,6 +254,41 @@ const Settings = () => {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveSuperTip = async () => {
+    if (!superTip.phrase.trim()) {
+      toast({
+        title: "Missing Phrase",
+        description: "Please enter a trigger phrase for your super tip.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingSuperTip(true);
+    try {
+      await upsertSuperTipConfig.mutateAsync({
+        trigger_phrase: superTip.phrase,
+        token_address: superTip.token.address,
+        token_symbol: superTip.token.symbol,
+        amount: parseFloat(superTip.amount),
+        is_enabled: true,
+      });
+
+      toast({
+        title: "Super Tip Saved",
+        description: `Super tip with phrase "${superTip.phrase}" saved successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingSuperTip(false);
     }
   };
 
@@ -661,6 +686,21 @@ const Settings = () => {
                   {superTip.amount} {superTip.token.symbol} instead of your normal tip amount.
                 </p>
               </div>
+
+              <Button 
+                onClick={handleSaveSuperTip} 
+                className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
+                disabled={isSavingSuperTip}
+              >
+                {isSavingSuperTip ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving Super Tip...
+                  </>
+                ) : (
+                  "Save Super Tip"
+                )}
+              </Button>
             </div>
           </Card>
 
