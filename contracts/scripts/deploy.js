@@ -11,7 +11,7 @@ async function main() {
   const balance = await hre.ethers.provider.getBalance(deployer.address);
   console.log("Account balance:", hre.ethers.formatEther(balance), "CELO");
 
-  // Relayer address (you'll use this address to execute tips)
+  // Relayer address 
   // IMPORTANT: Replace this with your actual relayer wallet address
   const RELAYER_ADDRESS = process.env.RELAYER_ADDRESS || deployer.address;
   
@@ -64,3 +64,5 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+
