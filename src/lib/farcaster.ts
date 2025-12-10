@@ -10,7 +10,7 @@ export const initializeFarcasterSDK = async () => {
   }
 
   try {
-    // Let the Farcaster host know the mini app is ready to be shown
+    // make sure the farcaster host knows the mini app is ready 
     await sdk.actions.ready();
 
     const context = await sdk.context;
