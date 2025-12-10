@@ -33,7 +33,7 @@ contract CeloTip is Ownable, ReentrancyGuard, Pausable {
 
     event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
 
-    // State variables
+    // State all variables
     address public relayer;
     
     // Mapping to track user's approved relayer status
