@@ -20,12 +20,14 @@ import { createPublicClient, http, formatUnits } from "viem";
 import { celo } from "viem/chains";
 import { useQuery } from "@tanstack/react-query";
 
+
 interface Token {
   symbol: string;
   name: string;
   address: string;
   balance: string;
 }
+
 
 interface LocalTipConfig {
   enabled: boolean;
