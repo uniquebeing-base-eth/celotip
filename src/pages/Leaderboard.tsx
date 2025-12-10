@@ -18,9 +18,11 @@ interface LeaderboardUser {
   count: number;
 }
 
+
 const Leaderboard = () => {
   const [timeFilter, setTimeFilter] = useState<"24h" | "7d" | "30d">("7d");
 
+  
   const getTimeFilterDate = () => {
     const now = new Date();
     switch (timeFilter) {
