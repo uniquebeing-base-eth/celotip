@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { CastCard } from "@/components/CastCard";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import { useDebounce } from "usehooks-ts";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface TrendingCast {
   id: string;
