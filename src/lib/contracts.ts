@@ -1,8 +1,10 @@
 // CeloTip Smart Contract Configuration
 export const CELOTIP_CONTRACT_ADDRESS = "0x6b3A9c2b4b4BB24D5DFa59132499cb4Fd29C733e" as const;
 
+
 // Relayer wallet address (executes tips on behalf of users)
 export const RELAYER_ADDRESS = "0xc6340F29b11F450877741a2f61A04D31Cb44d9B1" as const;
+
 
 // Standard ERC-20 token addresses on Celo
 export const TOKEN_ADDRESSES = {
@@ -11,6 +13,7 @@ export const TOKEN_ADDRESSES = {
   cEUR: "0xD8763CBa276a3738E6DE85b4b3bF5FDed6D6cA73", // Celo Euro
   cREAL: "0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787", // Celo Real
 } as const;
+
 
 // Minimum ERC-20 ABI for approve and allowance
 export const ERC20_ABI = [
