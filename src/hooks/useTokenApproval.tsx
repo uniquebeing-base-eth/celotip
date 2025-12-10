@@ -145,7 +145,7 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
 
       const provider = await sdk.wallet.ethProvider;
       
-      // Switch to Celo chain first
+      // Switch to Celo network chain first
       try {
         await provider.request({
           method: "wallet_switchEthereumChain",
