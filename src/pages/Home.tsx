@@ -30,7 +30,7 @@ queryFn: async (): Promise<TrendingCast[]> => {
 // Get aggregated tip data grouped by cast_hash
 const { data: transactions, error } = await supabase
 .from("transactions")
-.select(  id,   cast_hash,   to_fid,   amount,   token_symbol,   created_at,   status  )
+.select("id, cast_hash, to_fid, amount, token_symbol, created_at, status")
 .eq("status", "completed")
 .not("cast_hash", "is", null)
 .order("created_at", { ascending: false })
