@@ -26,10 +26,23 @@ export const initializeFarcasterSDK = async () => {
       const context = await sdk.context;
       console.log("Farcaster SDK initialized with context:", context);
       isSDKInitialized = true;
+
+      // Prompt to add mini app once if not already prompted
+      const hasPrompted = localStorage.getItem('celotip_miniapp_prompted');
+      if (!hasPrompted) {
+        try {
+          await sdk.actions.addMiniApp();
+          localStorage.setItem('celotip_miniapp_prompted', 'true');
+          console.log("Mini app add prompt shown");
+        } catch (e) {
+          console.warn("addMiniApp not available:", e);
+        }
+      }
+
       return context;
     } catch (error) {
       console.warn("Farcaster SDK init failed or timed out:", error);
-      isSDKInitialized = true; // Mark as initialized to prevent retries
+      isSDKInitialized = true;
       return null;
     }
   })();
