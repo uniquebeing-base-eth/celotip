@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      notification_tokens: {
+        Row: {
+          created_at: string
+          fid: number
+          id: string
+          is_valid: boolean
+          notification_url: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fid: number
+          id?: string
+          is_valid?: boolean
+          notification_url: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fid?: number
+          id?: string
+          is_valid?: boolean
+          notification_url?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           connected_address: string | null

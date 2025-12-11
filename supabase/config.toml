@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.get-cast-details]
 verify_jwt = false
+
+[functions.miniapp-webhook]
+verify_jwt = false
