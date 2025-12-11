@@ -18,6 +18,7 @@ interface Cast {
   tipCount: number;
   tokenSymbol: string;
   latestTipAt: string;
+  text?: string;
 }
 
 interface CastCardProps {
@@ -26,6 +27,13 @@ interface CastCardProps {
 
 export const CastCard = ({ cast }: CastCardProps) => {
   const warpcastUrl = `https://warpcast.com/~/conversations/${cast.hash}`;
+  
+  // Truncate text to ~100 chars
+  const truncatedText = cast.text 
+    ? cast.text.length > 100 
+      ? cast.text.substring(0, 100) + '...' 
+      : cast.text
+    : null;
   
   return (
     <Card className="p-4 bg-gradient-card border-border shadow-card hover:shadow-elevated transition-all duration-300 hover:-translate-y-1">
@@ -56,6 +64,12 @@ export const CastCard = ({ cast }: CastCardProps) => {
           <ExternalLink className="h-4 w-4" />
         </a>
       </div>
+
+      {truncatedText && (
+        <p className="text-sm text-foreground/90 mb-3 leading-relaxed">
+          {truncatedText}
+        </p>
+      )}
 
       <div className="flex items-center justify-between pt-3 border-t border-border/50">
         <div className="flex items-center gap-2">
