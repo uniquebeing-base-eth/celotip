@@ -28,7 +28,8 @@
     "tagline": "Engage Tip and Earn on Celo",
     "ogTitle": "CeloTip",
     "ogDescription": "Automatic tipping for Farcaster interactions on Celo",
-    "ogImageUrl": "https://celotip.vercel.app/preview.png?v=6"
+    "ogImageUrl": "https://celotip.vercel.app/preview.png?v=6",
+    "webhookUrl": "https://api.neynar.com/f/app/98843ee0-d4e3-4188-ad58-af03e2812187/event"
   }
 }
 
