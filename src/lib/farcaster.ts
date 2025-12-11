@@ -2,37 +2,49 @@ import sdk from "@farcaster/frame-sdk";
 import { supabase } from "@/integrations/supabase/client";
 
 let isSDKInitialized = false;
+let sdkInitPromise: Promise<any> | null = null;
 
 export const initializeFarcasterSDK = async () => {
   if (isSDKInitialized) {
-    console.log("Farcaster SDK already initialized");
-    return;
+    return sdk.context;
   }
 
-  try {
-    // Make sure the farcaster host knows the mini app is ready 
-    await sdk.actions.ready();
-
-    const context = await sdk.context;
-    console.log("Farcaster SDK initialized with context:", context);
-
-    isSDKInitialized = true;
-    return context;
-  } catch (error) {
-    console.error("Failed to initialize Farcaster SDK:", error);
-    // SDK might not be available in development/non-Farcaster environments
-    // This is expected and not an error
-    return null;
+  if (sdkInitPromise) {
+    return sdkInitPromise;
   }
+
+  sdkInitPromise = (async () => {
+    try {
+      // Signal ready with a short timeout to prevent blocking
+      const readyPromise = sdk.actions.ready();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("SDK ready timeout")), 3000)
+      );
+      
+      await Promise.race([readyPromise, timeoutPromise]);
+      
+      const context = await sdk.context;
+      console.log("Farcaster SDK initialized with context:", context);
+      isSDKInitialized = true;
+      return context;
+    } catch (error) {
+      console.warn("Farcaster SDK init failed or timed out:", error);
+      isSDKInitialized = true; // Mark as initialized to prevent retries
+      return null;
+    }
+  })();
+
+  return sdkInitPromise;
 };
 
 export const getFarcasterUser = async () => {
   try {
-    if (!isSDKInitialized) {
-      await initializeFarcasterSDK();
+    const context = await initializeFarcasterSDK();
+    
+    if (!context?.user) {
+      return null;
     }
     
-    const context = await sdk.context;
     return {
       fid: context.user.fid,
       username: context.user.username,
