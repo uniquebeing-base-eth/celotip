@@ -64,6 +64,60 @@ interface TipRequest {
   };
 }
 
+// Send notification to the tipper when their allowance runs out
+async function sendLowAllowanceNotification(
+  fid: number,
+  tokenSymbol: string,
+  supabase: any
+): Promise<void> {
+  try {
+    // Get the stored notification token for the user
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('notification_tokens')
+      .select('token, notification_url, is_valid')
+      .eq('fid', fid)
+      .eq('is_valid', true)
+      .maybeSingle();
+
+    if (tokenError || !tokenData?.token || !tokenData?.notification_url) {
+      console.log("No valid notification token found for FID:", fid);
+      return;
+    }
+
+    console.log(`Sending low allowance notification to FID ${fid}`);
+    
+    const notificationId = `allowance-${Date.now()}-${fid}`;
+    
+    const notificationPayload = {
+      notificationId,
+      title: `Your ${tokenSymbol} allowance ran out! ⚠️`,
+      body: `Top up your ${tokenSymbol} approval in CeloTip to continue auto-tipping.`,
+      targetUrl: 'https://celotip.vercel.app/settings',
+      tokens: [tokenData.token],
+    };
+
+    const response = await fetch(tokenData.notification_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notificationPayload),
+    });
+
+    console.log("Low allowance notification response:", response.status);
+    
+    if (response.ok) {
+      const result = await response.json();
+      if (result.invalidTokens?.length > 0) {
+        await supabase
+          .from('notification_tokens')
+          .update({ is_valid: false, updated_at: new Date().toISOString() })
+          .eq('fid', fid);
+      }
+    }
+  } catch (error) {
+    console.error("Error sending low allowance notification:", error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -185,6 +239,10 @@ serve(async (req) => {
 
     if (onChainAllowance < amountInWei) {
       console.log("Insufficient on-chain allowance");
+      
+      // Send notification to tipper that their allowance ran out
+      await sendLowAllowanceNotification(fromFid, tokenSymbol, supabase);
+      
       return new Response(
         JSON.stringify({ success: false, message: 'Insufficient token allowance. Please approve more tokens.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
