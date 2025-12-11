@@ -40,20 +40,16 @@ async function verifySignature(body: string, signature: string | null): Promise<
   }
 }
 
-// Send notification to recipient about received tip using Neynar Frame Notifications API
+// Send notification to recipient using their stored notification token
+// This follows the Farcaster Mini App notification spec
 async function sendTipNotification(
   recipientFid: number,
   senderUsername: string,
   amount: number,
   tokenSymbol: string,
-  interactionType: string
+  interactionType: string,
+  supabase: any
 ): Promise<void> {
-  const neynarApiKey = Deno.env.get('NEYNAR_API_KEY');
-  if (!neynarApiKey) {
-    console.warn("NEYNAR_API_KEY not set, skipping notification");
-    return;
-  }
-
   try {
     const interactionText = interactionType === 'like' ? 'liking' 
       : interactionType === 'recast' ? 'recasting'
@@ -62,8 +58,77 @@ async function sendTipNotification(
       : interactionType === 'follow' ? 'following'
       : interactionType;
 
-    // Use the Neynar Frame Notifications API as per docs
-    // https://docs.neynar.com/reference/publish-frame-notifications
+    // First, try to get the stored notification token for the recipient
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('notification_tokens')
+      .select('token, notification_url, is_valid')
+      .eq('fid', recipientFid)
+      .eq('is_valid', true)
+      .maybeSingle();
+
+    if (tokenError) {
+      console.error("Error fetching notification token:", tokenError);
+    }
+
+    // If we have a valid token, use the Farcaster notification endpoint directly
+    if (tokenData?.token && tokenData?.notification_url) {
+      console.log(`Sending notification to FID ${recipientFid} using stored token`);
+      
+      // Create unique notification ID to prevent duplicates
+      const notificationId = `tip-${Date.now()}-${recipientFid}-${senderUsername}`;
+      
+      const notificationPayload = {
+        notificationId,
+        title: `You received a tip! 🎉`,
+        body: `@${senderUsername} tipped you ${amount} ${tokenSymbol} for ${interactionText} your cast!`,
+        targetUrl: 'https://celotip.vercel.app',
+        tokens: [tokenData.token],
+      };
+
+      console.log("Sending to notification URL:", tokenData.notification_url);
+      
+      const response = await fetch(tokenData.notification_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(notificationPayload),
+      });
+
+      const responseText = await response.text();
+      console.log("Farcaster notification response status:", response.status);
+      console.log("Farcaster notification response:", responseText);
+
+      if (response.ok) {
+        try {
+          const result = JSON.parse(responseText);
+          // Handle invalid tokens - mark them as invalid in our database
+          if (result.invalidTokens && result.invalidTokens.length > 0) {
+            console.log("Marking invalid tokens:", result.invalidTokens);
+            await supabase
+              .from('notification_tokens')
+              .update({ is_valid: false, updated_at: new Date().toISOString() })
+              .eq('fid', recipientFid);
+          }
+          if (result.successfulTokens && result.successfulTokens.length > 0) {
+            console.log("Notification sent successfully to FID:", recipientFid);
+            return;
+          }
+        } catch (e) {
+          console.log("Could not parse response as JSON");
+        }
+      }
+    } else {
+      console.log(`No valid notification token found for FID ${recipientFid}, trying Neynar fallback`);
+    }
+
+    // Fallback to Neynar Frame Notifications API if no stored token
+    const neynarApiKey = Deno.env.get('NEYNAR_API_KEY');
+    if (!neynarApiKey) {
+      console.warn("NEYNAR_API_KEY not set, cannot send fallback notification");
+      return;
+    }
+
     const notificationUrl = 'https://api.neynar.com/v2/farcaster/frame/notifications';
     
     const response = await fetch(notificationUrl, {
@@ -82,17 +147,12 @@ async function sendTipNotification(
       }),
     });
 
-    console.log("Frame notification API response status:", response.status);
+    console.log("Neynar fallback notification response status:", response.status);
     const responseText = await response.text();
-    console.log("Frame notification API response:", responseText);
+    console.log("Neynar fallback notification response:", responseText);
 
-    if (!response.ok) {
-      console.error("Failed to send frame notification:", responseText);
-    } else {
-      console.log("Frame notification sent to FID:", recipientFid);
-    }
   } catch (error) {
-    console.error("Error sending frame notification:", error);
+    console.error("Error sending notification:", error);
   }
 }
 
@@ -347,7 +407,7 @@ serve(async (req) => {
       const tipAmount = useSuperTip ? superTipConfig?.amount : processTipResult.amount;
       const tipToken = useSuperTip ? superTipConfig?.token_symbol : processTipResult.tokenSymbol;
       
-      await sendTipNotification(toFid, senderUsername, tipAmount, tipToken, interactionType);
+      await sendTipNotification(toFid, senderUsername, tipAmount, tipToken, interactionType, supabase);
     }
 
     return new Response(

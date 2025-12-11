@@ -97,3 +97,53 @@ export const closeFrame = () => {
     console.error("Failed to close frame:", error);
   }
 };
+
+// Share content to Farcaster using the SDK's composeCast action
+export const shareToFarcaster = async (options: {
+  text?: string;
+  embeds?: string[];
+}) => {
+  try {
+    // Use the SDK's composeCast action to open the cast composer
+    await sdk.actions.composeCast({
+      text: options.text || '',
+      embeds: options.embeds as [`https://${string}`, `https://${string}`] | [`https://${string}`] | undefined,
+    });
+    console.log("Farcaster cast composer opened");
+    return true;
+  } catch (error) {
+    console.error("Failed to share to Farcaster:", error);
+    // Fallback: open Warpcast web composer
+    const text = encodeURIComponent(options.text || '');
+    const embedUrl = options.embeds?.[0] ? `&embeds[]=${encodeURIComponent(options.embeds[0])}` : '';
+    window.open(`https://warpcast.com/~/compose?text=${text}${embedUrl}`, "_blank");
+    return false;
+  }
+};
+
+// Prompt user to add the mini app for notifications
+export const promptAddMiniApp = async () => {
+  try {
+    const result = await sdk.actions.addMiniApp();
+    console.log("addMiniApp result:", result);
+    return result;
+  } catch (error) {
+    console.error("Failed to add mini app:", error);
+    return null;
+  }
+};
+
+// Get notification details if available from context
+export const getNotificationDetails = async () => {
+  try {
+    const context = await sdk.context;
+    // Check if we're coming from a notification
+    if (context.location?.type === 'notification') {
+      return context.location.notification;
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to get notification details:", error);
+    return null;
+  }
+};
