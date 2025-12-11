@@ -40,7 +40,7 @@ async function verifySignature(body: string, signature: string | null): Promise<
   }
 }
 
-// Send notification to recipient about received tip
+// Send notification to recipient about received tip using Neynar Frame Notifications API
 async function sendTipNotification(
   recipientFid: number,
   senderUsername: string,
@@ -62,7 +62,9 @@ async function sendTipNotification(
       : interactionType === 'follow' ? 'following'
       : interactionType;
 
-    const notificationUrl = 'https://api.neynar.com/v2/farcaster/notifications/send';
+    // Use the Neynar Frame Notifications API as per docs
+    // https://docs.neynar.com/reference/publish-frame-notifications
+    const notificationUrl = 'https://api.neynar.com/v2/farcaster/frame/notifications';
     
     const response = await fetch(notificationUrl, {
       method: 'POST',
@@ -80,16 +82,17 @@ async function sendTipNotification(
       }),
     });
 
-    console.log("Notification API response status:", response.status);
+    console.log("Frame notification API response status:", response.status);
+    const responseText = await response.text();
+    console.log("Frame notification API response:", responseText);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Failed to send notification:", errorText);
+      console.error("Failed to send frame notification:", responseText);
     } else {
-      console.log("Notification sent to FID:", recipientFid);
+      console.log("Frame notification sent to FID:", recipientFid);
     }
   } catch (error) {
-    console.error("Error sending notification:", error);
+    console.error("Error sending frame notification:", error);
   }
 }
 
