@@ -70,10 +70,10 @@ if (error) throw error;
     }  
   });  
 
-  // Sort by total tips descending  
+  // Sort by latest tip time descending (most recent first)  
   const sortedCasts = Array.from(castMap.values())  
-    .sort((a, b) => b.total_tips - a.total_tips)  
-    .slice(0, 20);  
+    .sort((a, b) => new Date(b.latest_tip_at).getTime() - new Date(a.latest_tip_at).getTime())  
+    .slice(0, 20);
 
   // Fetch profile info for each recipient  
   const fids = [...new Set(sortedCasts.map((c) => c.to_fid))];  
