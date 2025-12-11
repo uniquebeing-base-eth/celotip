@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CastCard } from "@/components/CastCard";
+import { TopCastsHighlight } from "@/components/TopCastsHighlight";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
@@ -127,10 +128,12 @@ return (
 <Header onSearch={setSearchQuery} />
 
 <main className="max-w-2xl mx-auto px-4 py-6">  
+    <TopCastsHighlight />
+    
     <div className="mb-6">  
-      <h2 className="text-2xl font-bold text-foreground mb-1">Trending Casts</h2>  
-      <p className="text-sm text-muted-foreground">Casts receiving the most tips right now</p>  
-    </div>  
+      <h2 className="text-2xl font-bold text-foreground mb-1">Recent Tips</h2>  
+      <p className="text-sm text-muted-foreground">Latest tipped casts on Farcaster</p>  
+    </div>
 
     <div className="space-y-4">  
       {isLoading ? (  
