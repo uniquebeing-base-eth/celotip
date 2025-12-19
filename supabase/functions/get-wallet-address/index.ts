@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const NEYNAR_API_BASE = "https://api.neynar.com/v2";

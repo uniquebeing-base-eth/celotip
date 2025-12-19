@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -56,65 +55,12 @@ serve(async (req) => {
     // Handle events
     switch (event) {
       case 'miniapp_added':
-        if (notificationDetails?.token && notificationDetails?.url) {
-          console.log(`Storing notification token for miniapp_added event`);
-          
-          if (!fid) {
-            console.warn("No FID found in payload, cannot store token");
-            return new Response(
-              JSON.stringify({ success: true, message: 'Event received but no FID to associate token' }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          // Upsert notification token
-          const { error } = await supabase
-            .from('notification_tokens')
-            .upsert({
-              fid,
-              token: notificationDetails.token,
-              notification_url: notificationDetails.url,
-              is_valid: true,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'fid' });
-
-          if (error) {
-            console.error("Error storing notification token:", error);
-            return new Response(
-              JSON.stringify({ success: false, error: error.message }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          console.log(`Notification token stored for FID ${fid}`);
-
-          // Send welcome notification
-          try {
-            const welcomePayload = {
-              notificationId: `welcome-${Date.now()}-${fid}`,
-              title: "Welcome to CeloTip! 🎉",
-              body: "Engage. Tip. Earn. Configure your auto-tipping settings to start rewarding your favorite creators!",
-              targetUrl: 'https://celotip.vercel.app/settings',
-              tokens: [notificationDetails.token],
-            };
-
-            const welcomeResponse = await fetch(notificationDetails.url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(welcomePayload),
-            });
-
-            console.log("Welcome notification response:", welcomeResponse.status);
-          } catch (welcomeError) {
-            console.error("Error sending welcome notification:", welcomeError);
-          }
-        }
-        break;
-
       case 'notifications_enabled':
         if (notificationDetails?.token && notificationDetails?.url) {
-          console.log(`Storing notification token for notifications_enabled event`);
+          console.log(`Storing notification token for event: ${event}`);
           
+          // We need to get FID from the notification context
+          // Since Neynar manages this, the fid should be in the payload or we extract from signed data
           if (!fid) {
             console.warn("No FID found in payload, cannot store token");
             return new Response(

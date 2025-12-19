@@ -1,5 +1,3 @@
-
-
 import sdk from "@farcaster/frame-sdk";
 import { supabase } from "@/integrations/supabase/client";
 
