@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.miniapp-webhook]
 verify_jwt = false
+
+[functions.daily-tip-summary]
+verify_jwt = false
