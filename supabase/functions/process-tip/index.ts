@@ -64,6 +64,59 @@ interface TipRequest {
   };
 }
 
+// Send notification to prompt user to set up tipping
+async function sendSetupTipNotification(
+  fid: number,
+  interactionType: string,
+  supabase: any
+): Promise<void> {
+  try {
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('notification_tokens')
+      .select('token, notification_url, is_valid')
+      .eq('fid', fid)
+      .eq('is_valid', true)
+      .maybeSingle();
+
+    if (tokenError || !tokenData?.token || !tokenData?.notification_url) {
+      console.log("No valid notification token found for FID:", fid);
+      return;
+    }
+
+    console.log(`Sending setup tip notification to FID ${fid} for ${interactionType}`);
+    
+    const notificationId = `setup-tip-${Date.now()}-${fid}`;
+    
+    const notificationPayload = {
+      notificationId,
+      title: `Set up auto-tipping! 💰`,
+      body: `You just ${interactionType === 'like' ? 'liked' : interactionType === 'recast' ? 'recasted' : interactionType === 'follow' ? 'followed someone' : 'interacted with'} a post. Configure CeloTip to auto-tip when you engage!`,
+      targetUrl: 'https://celotip.vercel.app/settings',
+      tokens: [tokenData.token],
+    };
+
+    const response = await fetch(tokenData.notification_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notificationPayload),
+    });
+
+    console.log("Setup tip notification response:", response.status);
+    
+    if (response.ok) {
+      const result = await response.json();
+      if (result.invalidTokens?.length > 0) {
+        await supabase
+          .from('notification_tokens')
+          .update({ is_valid: false, updated_at: new Date().toISOString() })
+          .eq('fid', fid);
+      }
+    }
+  } catch (error) {
+    console.error("Error sending setup tip notification:", error);
+  }
+}
+
 // Send notification to the tipper when their allowance runs out
 async function sendLowAllowanceNotification(
   fid: number,
@@ -71,7 +124,6 @@ async function sendLowAllowanceNotification(
   supabase: any
 ): Promise<void> {
   try {
-    // Get the stored notification token for the user
     const { data: tokenData, error: tokenError } = await supabase
       .from('notification_tokens')
       .select('token, notification_url, is_valid')
@@ -200,6 +252,10 @@ serve(async (req) => {
 
       if (!tipConfig) {
         console.log("No tip configuration found for this interaction type");
+        
+        // Send notification prompting user to set up tipping
+        await sendSetupTipNotification(fromFid, interactionType, supabase);
+        
         return new Response(
           JSON.stringify({ success: false, message: 'No tip configuration found' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
