@@ -1,3 +1,5 @@
+
+
 // CeloTip Smart Contract Configuration
 export const CELOTIP_CONTRACT_ADDRESS = "0x6b3A9c2b4b4BB24D5DFa59132499cb4Fd29C733e" as const;
 
