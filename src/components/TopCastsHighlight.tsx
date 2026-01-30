@@ -1,4 +1,5 @@
 
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Trophy, Coins, ExternalLink } from "lucide-react";
