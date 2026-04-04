@@ -257,7 +257,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_or_create_profile_by_wallet: {
+        Args: { p_wallet_address: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

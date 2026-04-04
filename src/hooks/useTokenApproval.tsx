@@ -1,11 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getFarcasterUser } from "@/lib/farcaster";
+import { useWalletAuth } from "./useWalletAuth";
 import { useWallet } from "./useWallet";
 import { createPublicClient, createWalletClient, custom, http, parseUnits, formatUnits } from "viem";
 import { celo } from "viem/chains";
 import { CELOTIP_CONTRACT_ADDRESS, ERC20_ABI } from "@/lib/contracts";
-import sdk from "@farcaster/frame-sdk";
 
 const publicClient = createPublicClient({
   chain: celo,
@@ -14,7 +13,7 @@ const publicClient = createPublicClient({
 
 export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
   const queryClient = useQueryClient();
-  const { walletAddress } = useWallet();
+  const { walletAddress, fid, getProvider } = useWalletAuth();
 
   // Fetch current allowance from blockchain
   const { data: allowance, isLoading: isLoadingAllowance } = useQuery({
@@ -43,41 +42,37 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
 
   // Fetch approval record from database
   const { data: approvalRecord } = useQuery({
-    queryKey: ["approvalRecord", tokenAddress],
+    queryKey: ["approvalRecord", tokenAddress, fid],
     queryFn: async () => {
-      const user = await getFarcasterUser();
-      if (!user) return null;
+      if (!fid) return null;
 
       const { data, error } = await supabase
         .from("token_approvals")
         .select("*")
-        .eq("fid", user.fid)
+        .eq("fid", fid)
         .eq("token_address", tokenAddress)
         .maybeSingle();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!walletAddress,
+    enabled: !!fid,
   });
 
   // Approve token spending
   const approveMutation = useMutation({
     mutationFn: async (amount: string) => {
-      const user = await getFarcasterUser();
-      if (!user || !walletAddress) throw new Error("User not authenticated");
+      if (!walletAddress || !fid) throw new Error("Wallet not connected");
 
-      // Create wallet client using Farcaster Frame SDK
-      const provider = await sdk.wallet.ethProvider;
+      const provider = await getProvider();
       
       // Switch to Celo chain first
       try {
         await provider.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0xa4ec" }], // 42220 in hex
+          params: [{ chainId: "0xa4ec" }],
         });
       } catch (switchError: any) {
-        // Chain not added, try to add it
         if (switchError.code === 4902) {
           await provider.request({
             method: "wallet_addEthereumChain",
@@ -99,10 +94,8 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
         transport: custom(provider),
       });
 
-      // Parse amount to wei
       const amountWei = parseUnits(amount, 18);
 
-      // Execute approval transaction
       const hash = await (walletClient.writeContract as any)({
         address: tokenAddress as `0x${string}`,
         abi: ERC20_ABI,
@@ -112,14 +105,12 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
         chain: celo,
       }) as `0x${string}`;
 
-      // Wait for transaction confirmation
       await publicClient.waitForTransactionReceipt({ hash });
 
-      // Save to database
       const { error } = await supabase
         .from("token_approvals")
         .upsert({
-          fid: user.fid,
+          fid,
           token_address: tokenAddress,
           token_symbol: tokenSymbol,
           approved_amount: parseFloat(amount),
@@ -140,16 +131,14 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
   // Revoke token approval
   const revokeMutation = useMutation({
     mutationFn: async () => {
-      const user = await getFarcasterUser();
-      if (!user || !walletAddress) throw new Error("User not authenticated");
+      if (!walletAddress || !fid) throw new Error("Wallet not connected");
 
-      const provider = await sdk.wallet.ethProvider;
+      const provider = await getProvider();
       
-      // Switch to Celo network chain first
       try {
         await provider.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0xa4ec" }], // 42220 in hex
+          params: [{ chainId: "0xa4ec" }],
         });
       } catch (switchError: any) {
         if (switchError.code === 4902) {
@@ -173,7 +162,6 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
         transport: custom(provider),
       });
 
-      // Set approval to 0 to revoke
       const hash = await (walletClient.writeContract as any)({
         address: tokenAddress as `0x${string}`,
         abi: ERC20_ABI,
@@ -185,11 +173,10 @@ export const useTokenApproval = (tokenAddress: string, tokenSymbol: string) => {
 
       await publicClient.waitForTransactionReceipt({ hash });
 
-      // Delete from database
       await supabase
         .from("token_approvals")
         .delete()
-        .eq("fid", user.fid)
+        .eq("fid", fid)
         .eq("token_address", tokenAddress);
 
       return hash;

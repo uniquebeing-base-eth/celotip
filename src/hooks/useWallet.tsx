@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getWalletAddress } from "@/lib/farcaster";
+import { useWalletAuth } from "./useWalletAuth";
 import { createPublicClient, http, formatEther } from "viem";
 import { celo } from "viem/chains";
 
@@ -9,11 +9,7 @@ const celoClient = createPublicClient({
 });
 
 export const useWallet = () => {
-  const { data: walletAddress, isLoading: isLoadingAddress } = useQuery({
-    queryKey: ["walletAddress"],
-    queryFn: getWalletAddress,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const { walletAddress, isLoading: isLoadingAuth } = useWalletAuth();
 
   const { data: balance, isLoading: isLoadingBalance } = useQuery({
     queryKey: ["celoBalance", walletAddress],
@@ -27,15 +23,13 @@ export const useWallet = () => {
       return formatEther(balanceWei);
     },
     enabled: !!walletAddress,
-    staleTime: 1000 * 30, // 30 seconds
-    refetchInterval: 1000 * 30, // Refresh every 30 seconds
+    staleTime: 1000 * 30,
+    refetchInterval: 1000 * 30,
   });
 
   return {
     walletAddress,
     balance,
-    isLoading: isLoadingAddress || isLoadingBalance,
+    isLoading: isLoadingAuth || isLoadingBalance,
   };
 };
-
-
