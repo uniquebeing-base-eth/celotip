@@ -60,17 +60,17 @@ const Home = () => {
       const results = [];
       for (const token of TOKENS) {
         try {
-          const bal = await publicClient.readContract({
+          const bal = await (publicClient.readContract as any)({
             address: token.address as `0x${string}`,
             abi: ERC20_ABI,
             functionName: "balanceOf",
             args: [walletAddress as `0x${string}`],
-          });
-          const decimals = await publicClient.readContract({
+          }) as bigint;
+          const decimals = await (publicClient.readContract as any)({
             address: token.address as `0x${string}`,
             abi: ERC20_ABI,
             functionName: "decimals",
-          });
+          }) as number;
           results.push({
             symbol: token.symbol,
             balance: parseFloat(formatUnits(bal, decimals)),
@@ -107,13 +107,16 @@ const Home = () => {
         .in("fid", allFids);
       const profileMap = new Map(profiles?.map(p => [p.fid, p]) || []);
 
-      return data?.map(tx => ({
-        ...tx,
-        isSent: tx.from_fid === fid,
-        counterpartyName: profileMap.get(tx.isSent ? tx.to_fid : tx.from_fid)?.display_name 
-          || profileMap.get(tx.from_fid === fid ? tx.to_fid : tx.from_fid)?.username
-          || `User`,
-      })) || [];
+      return data?.map(tx => {
+        const isSent = tx.from_fid === fid;
+        const counterpartyFid = isSent ? tx.to_fid : tx.from_fid;
+        const counterpartyProfile = profileMap.get(counterpartyFid);
+        return {
+          ...tx,
+          isSent,
+          counterpartyName: counterpartyProfile?.display_name || counterpartyProfile?.username || `User`,
+        };
+      }) || [];
     },
     enabled: !!fid,
     staleTime: 15000,

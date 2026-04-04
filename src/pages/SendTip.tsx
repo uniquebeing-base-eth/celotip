@@ -77,17 +77,17 @@ const SendTip = () => {
       const balances: Record<string, string> = {};
       for (const token of AVAILABLE_TOKENS) {
         try {
-          const bal = await publicClient.readContract({
+          const bal = await (publicClient.readContract as any)({
             address: token.address as `0x${string}`,
             abi: BALANCE_ABI,
             functionName: "balanceOf",
             args: [walletAddress as `0x${string}`],
-          });
-          const decimals = await publicClient.readContract({
+          }) as bigint;
+          const decimals = await (publicClient.readContract as any)({
             address: token.address as `0x${string}`,
             abi: BALANCE_ABI,
             functionName: "decimals",
-          });
+          }) as number;
           balances[token.address] = formatUnits(bal, decimals);
         } catch {
           balances[token.address] = "0";
@@ -138,20 +138,20 @@ const SendTip = () => {
       });
 
       // First approve the token to the contract
-      const decimals = await publicClient.readContract({
+      const decimals = await (publicClient.readContract as any)({
         address: selectedToken.address as `0x${string}`,
         abi: BALANCE_ABI,
         functionName: "decimals",
-      });
+      }) as number;
       const amountInWei = parseUnits(amount, decimals);
 
       // Check current allowance
-      const currentAllowance = await publicClient.readContract({
+      const currentAllowance = await (publicClient.readContract as any)({
         address: selectedToken.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "allowance",
         args: [walletAddress as `0x${string}`, CELOTIP_CONTRACT_ADDRESS as `0x${string}`],
-      });
+      }) as bigint;
 
       if ((currentAllowance as bigint) < amountInWei) {
         // Need to approve first
