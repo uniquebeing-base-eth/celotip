@@ -14,23 +14,21 @@
     "buttonTitle": "Launch CeloTip",
     "splashImageUrl": "https://celotip.vercel.app/splash.png?v=6",
     "splashBackgroundColor": "#CCFF00",
-    "subtitle": "Auto tip creators on Celo",
-    "description": "Set rules and auto reward creators you engage",
-    "primaryCategory": "social",
+    "subtitle": "Tip anyone on Celo",
+    "description": "Send and receive tips instantly on the Celo network via MiniPay",
+    "primaryCategory": "finance",
     "tags": [
       "tipping",
-      "social",
+      "payments",
       "celo",
-      "rewards",
-      "engagement"
+      "minipay",
+      "p2p"
     ],
     "heroImageUrl": "https://celotip.vercel.app/preview.png?v=6",
-    "tagline": "Engage Tip and Earn on Celo",
+    "tagline": "Tip Anyone, Anywhere on Celo",
     "ogTitle": "CeloTip",
-    "ogDescription": "Automatic tipping for Farcaster interactions on Celo",
+    "ogDescription": "Send and receive tips instantly on the Celo network",
     "ogImageUrl": "https://celotip.vercel.app/preview.png?v=6",
     "webhookUrl": "https://api.neynar.com/f/app/98843ee0-d4e3-4188-ad58-af03e2812187/event"
   }
 }
-
-

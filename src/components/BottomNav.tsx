@@ -1,6 +1,5 @@
 
-
-import { Home, Trophy, Settings } from "lucide-react";
+import { Home, Send, Trophy, Settings } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 export const BottomNav = () => {
@@ -11,7 +10,7 @@ export const BottomNav = () => {
           <NavLink
             to="/"
             end
-            className="flex flex-col items-center gap-1 px-6 py-2 rounded-lg transition-all"
+            className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all"
             activeClassName="text-primary bg-secondary/50"
           >
             {({ isActive }) => (
@@ -23,21 +22,34 @@ export const BottomNav = () => {
           </NavLink>
 
           <NavLink
+            to="/send"
+            className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all"
+            activeClassName="text-primary bg-secondary/50"
+          >
+            {({ isActive }) => (
+              <>
+                <Send className={`h-5 w-5 ${isActive ? 'fill-current' : ''}`} />
+                <span className="text-xs font-medium">Send</span>
+              </>
+            )}
+          </NavLink>
+
+          <NavLink
             to="/leaderboard"
-            className="flex flex-col items-center gap-1 px-6 py-2 rounded-lg transition-all"
+            className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all"
             activeClassName="text-primary bg-secondary/50"
           >
             {({ isActive }) => (
               <>
                 <Trophy className={`h-5 w-5 ${isActive ? 'fill-current' : ''}`} />
-                <span className="text-xs font-medium">Leaderboard</span>
+                <span className="text-xs font-medium">Ranks</span>
               </>
             )}
           </NavLink>
 
           <NavLink
             to="/settings"
-            className="flex flex-col items-center gap-1 px-6 py-2 rounded-lg transition-all"
+            className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all"
             activeClassName="text-primary bg-secondary/50"
           >
             {({ isActive }) => (
