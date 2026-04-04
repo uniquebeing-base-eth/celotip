@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useFarcasterAuth } from "./useFarcasterAuth";
+import { useWalletAuth } from "./useWalletAuth";
 
 export interface TipConfig {
   id: string;
@@ -23,51 +23,51 @@ export interface SuperTipConfig {
 }
 
 export const useTipConfig = () => {
-  const { user } = useFarcasterAuth();
+  const { fid } = useWalletAuth();
   const queryClient = useQueryClient();
 
   const { data: tipConfigs, isLoading: isLoadingTips } = useQuery({
-    queryKey: ["tipConfigs", user?.fid],
+    queryKey: ["tipConfigs", fid],
     queryFn: async () => {
-      if (!user?.fid) return [];
+      if (!fid) return [];
       
       const { data, error } = await supabase
         .from("tip_configs")
         .select("*")
-        .eq("fid", user.fid);
+        .eq("fid", fid);
 
       if (error) throw error;
       return data as TipConfig[];
     },
-    enabled: !!user?.fid,
+    enabled: !!fid,
   });
 
   const { data: superTipConfig, isLoading: isLoadingSuperTip } = useQuery({
-    queryKey: ["superTipConfig", user?.fid],
+    queryKey: ["superTipConfig", fid],
     queryFn: async () => {
-      if (!user?.fid) return null;
+      if (!fid) return null;
       
       const { data, error } = await supabase
         .from("super_tip_configs")
         .select("*")
-        .eq("fid", user.fid)
+        .eq("fid", fid)
         .single();
 
       if (error && error.code !== "PGRST116") throw error;
       return data as SuperTipConfig | null;
     },
-    enabled: !!user?.fid,
+    enabled: !!fid,
   });
 
   const upsertTipConfig = useMutation({
     mutationFn: async (config: Omit<TipConfig, "id">) => {
-      if (!user?.fid) throw new Error("User not authenticated");
+      if (!fid) throw new Error("Wallet not connected");
 
       const { data, error } = await supabase
         .from("tip_configs")
         .upsert({
           ...config,
-          fid: user.fid,
+          fid,
         }, {
           onConflict: "fid,interaction_type"
         })
@@ -78,19 +78,19 @@ export const useTipConfig = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tipConfigs", user?.fid] });
+      queryClient.invalidateQueries({ queryKey: ["tipConfigs", fid] });
     },
   });
 
   const upsertSuperTipConfig = useMutation({
     mutationFn: async (config: Omit<SuperTipConfig, "id" | "fid">) => {
-      if (!user?.fid) throw new Error("User not authenticated");
+      if (!fid) throw new Error("Wallet not connected");
 
       const { data, error } = await supabase
         .from("super_tip_configs")
         .upsert({
           ...config,
-          fid: user.fid,
+          fid,
         }, {
           onConflict: "fid"
         })
@@ -101,23 +101,23 @@ export const useTipConfig = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["superTipConfig", user?.fid] });
+      queryClient.invalidateQueries({ queryKey: ["superTipConfig", fid] });
     },
   });
 
   const deleteSuperTipConfig = useMutation({
     mutationFn: async () => {
-      if (!user?.fid) throw new Error("User not authenticated");
+      if (!fid) throw new Error("Wallet not connected");
 
       const { error } = await supabase
         .from("super_tip_configs")
         .delete()
-        .eq("fid", user.fid);
+        .eq("fid", fid);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["superTipConfig", user?.fid] });
+      queryClient.invalidateQueries({ queryKey: ["superTipConfig", fid] });
     },
   });
 
@@ -130,5 +130,3 @@ export const useTipConfig = () => {
     deleteSuperTipConfig,
   };
 };
-
-
