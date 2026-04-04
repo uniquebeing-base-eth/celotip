@@ -55,17 +55,17 @@ const Settings = () => {
       const balances: Record<string, string> = {};
       for (const token of AVAILABLE_TOKENS) {
         try {
-          const balance = await publicClient.readContract({
+          const balance = await (publicClient.readContract as any)({
             address: token.address as `0x${string}`,
             abi: ERC20_BALANCE_ABI,
             functionName: "balanceOf",
             args: [walletAddress as `0x${string}`],
-          });
-          const decimals = await publicClient.readContract({
+          }) as bigint;
+          const decimals = await (publicClient.readContract as any)({
             address: token.address as `0x${string}`,
             abi: ERC20_BALANCE_ABI,
             functionName: "decimals",
-          });
+          }) as number;
           balances[token.address] = formatUnits(balance, decimals);
         } catch {
           balances[token.address] = "0";
