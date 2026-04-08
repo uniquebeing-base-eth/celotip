@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -15,8 +14,10 @@ interface LeaderboardUser {
   username: string;
   displayName?: string;
   pfpUrl?: string;
+  imageUrl?: string;
   amount: number;
   count: number;
+  isBoosted: boolean;
 }
 
 const Leaderboard = () => {
@@ -57,20 +58,24 @@ const Leaderboard = () => {
     const fids = sorted.map(e => e.fid);
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("fid, username, display_name, pfp_url")
+      .select("fid, username, display_name, pfp_url, image_url, boost_end")
       .in("fid", fids);
 
     const profileMap = new Map(profiles?.map(p => [p.fid, p]) || []);
+    const now = new Date();
+
     return sorted.map((entry, i): LeaderboardUser => {
       const profile = profileMap.get(entry.fid);
       return {
         rank: i + 1,
         fid: entry.fid,
-        username: profile?.username || `User`,
+        username: profile?.username || "User",
         displayName: profile?.display_name || undefined,
         pfpUrl: profile?.pfp_url || undefined,
+        imageUrl: profile?.image_url || undefined,
         amount: entry.amount,
         count: entry.count,
+        isBoosted: profile?.boost_end ? new Date(profile.boost_end) > now : false,
       };
     });
   };
@@ -92,21 +97,16 @@ const Leaderboard = () => {
   return (
     <div className="min-h-screen bg-background pb-24">
       <Header />
-      
+
       <main className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground mb-1">Leaderboard</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-1">Rankings</h2>
           <p className="text-sm text-muted-foreground">Top tippers and earners on CeloTip</p>
         </div>
 
         <div className="flex gap-2 mb-6">
           {(["24h", "7d", "30d"] as const).map(f => (
-            <Button
-              key={f}
-              variant={timeFilter === f ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTimeFilter(f)}
-            >
+            <Button key={f} variant={timeFilter === f ? "default" : "outline"} size="sm" onClick={() => setTimeFilter(f)}>
               {f === "24h" ? "24h" : f === "7d" ? "7 Days" : "30 Days"}
             </Button>
           ))}
@@ -114,12 +114,8 @@ const Leaderboard = () => {
 
         <Tabs defaultValue="earners" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="earners" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Top Earners
-            </TabsTrigger>
-            <TabsTrigger value="tippers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Top Tippers
-            </TabsTrigger>
+            <TabsTrigger value="earners">Top Earners</TabsTrigger>
+            <TabsTrigger value="tippers">Top Tippers</TabsTrigger>
           </TabsList>
 
           {["earners", "tippers"].map(tab => (
@@ -132,7 +128,7 @@ const Leaderboard = () => {
                 (tab === "earners" ? topEarners : topTippers)!.map(user => (
                   <LeaderboardItem key={`${tab}-${user.fid}`} user={{
                     rank: user.rank, username: user.username, displayName: user.displayName,
-                    pfpUrl: user.pfpUrl, amount: user.amount, tipCount: user.count,
+                    pfpUrl: user.pfpUrl || user.imageUrl, amount: user.amount, tipCount: user.count,
                   }} />
                 ))
               ) : (

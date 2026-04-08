@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -10,222 +9,125 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title CeloTip
- * @notice Automated tipping contract for Farcaster interactions on Celo
- * @dev Users approve tokens, relayer executes tips based on social interactions
+ * @notice Discovery + Tipping platform on Celo. Users tip with cUSD, platform takes a fee.
+ * @dev Users approve cUSD, then call tip() directly. Fee split happens on-chain.
  */
 contract CeloTip is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
-    // Events
-    event TipSent(
+    // --- Events ---
+    event Tipped(
         address indexed from,
         address indexed to,
-        address indexed token,
         uint256 amount,
-        string interactionType,
-        string castHash
+        uint256 fee
     );
 
-    event TokensRevoked(
+    event Boosted(
         address indexed user,
-        address indexed token,
         uint256 amount
     );
 
-    event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
+    event FeeUpdated(uint256 oldFee, uint256 newFee);
+    event PlatformWalletUpdated(address indexed oldWallet, address indexed newWallet);
+    event BoostPriceUpdated(uint256 oldPrice, uint256 newPrice);
 
-    // State all variables
-    address public relayer;
-    
-    // Mapping to track user's approved relayer status
-    mapping(address => mapping(address => bool)) public userTokenApprovals;
+    // --- State ---
+    IERC20 public immutable cUSD;
+    address public platformWallet;
+    uint256 public feeBps; // basis points, e.g. 500 = 5%
+    uint256 public boostPrice; // in cUSD wei (18 decimals)
 
-    // Errors
-    error Unauthorized();
-    error InvalidAmount();
+    // --- Errors ---
     error InvalidAddress();
-    error TransferFailed();
+    error InvalidAmount();
+    error SelfTipNotAllowed();
     error InsufficientAllowance();
+    error FeeTooHigh();
 
     /**
-     * @notice Constructor sets the relayer address
-     * @param _relayer Address authorized to execute tips
+     * @param _cUSD Address of the cUSD token on Celo
+     * @param _platformWallet Address to receive platform fees
+     * @param _feeBps Fee in basis points (e.g. 500 = 5%)
+     * @param _boostPrice Price to boost a profile in cUSD (18 decimals)
      */
-    constructor(address _relayer) Ownable(msg.sender) {
-        if (_relayer == address(0)) revert InvalidAddress();
-        relayer = _relayer;
+    constructor(
+        address _cUSD,
+        address _platformWallet,
+        uint256 _feeBps,
+        uint256 _boostPrice
+    ) Ownable(msg.sender) {
+        if (_cUSD == address(0) || _platformWallet == address(0)) revert InvalidAddress();
+        if (_feeBps > 2000) revert FeeTooHigh(); // max 20%
+
+        cUSD = IERC20(_cUSD);
+        platformWallet = _platformWallet;
+        feeBps = _feeBps;
+        boostPrice = _boostPrice;
     }
 
     /**
-     * @notice Modifier to restrict functions to relayer only
+     * @notice Tip a recipient in cUSD. Platform fee is deducted automatically.
+     * @param to Recipient address
+     * @param amount Total cUSD amount (before fee)
      */
-    modifier onlyRelayer() {
-        if (msg.sender != relayer) revert Unauthorized();
-        _;
-    }
-
-    /**
-     * @notice Execute a tip from one user to another
-     * @param from Address of the tipper
-     * @param to Address of the recipient
-     * @param tokenAddress Address of the ERC20 token
-     * @param amount Amount to tip
-     * @param interactionType Type of interaction (like, comment, recast, etc.)
-     * @param castHash Hash of the cast being tipped
-     */
-    function sendTip(
-        address from,
-        address to,
-        address tokenAddress,
-        uint256 amount,
-        string memory interactionType,
-        string memory castHash
-    ) external onlyRelayer whenNotPaused nonReentrant {
-        if (from == address(0) || to == address(0) || tokenAddress == address(0)) {
-            revert InvalidAddress();
-        }
+    function tip(address to, uint256 amount) external whenNotPaused nonReentrant {
+        if (to == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
-        if (from == to) revert InvalidAddress(); // Cannot tip yourself
+        if (msg.sender == to) revert SelfTipNotAllowed();
 
-        IERC20 token = IERC20(tokenAddress);
-        
-        // Check allowance
-        uint256 allowance = token.allowance(from, address(this));
-        if (allowance < amount) revert InsufficientAllowance();
+        uint256 fee = (amount * feeBps) / 10000;
+        uint256 recipientAmount = amount - fee;
 
-        // Transfer tokens from tipper to recipient
-        token.safeTransferFrom(from, to, amount);
-
-        emit TipSent(from, to, tokenAddress, amount, interactionType, castHash);
-    }
-
-    /**
-     * @notice Batch send multiple tips in one transaction
-     * @param froms Array of tipper addresses
-     * @param tos Array of recipient addresses
-     * @param tokenAddresses Array of token addresses
-     * @param amounts Array of tip amounts
-     * @param interactionTypes Array of interaction types
-     * @param castHashes Array of cast hashes
-     */
-    function sendBatchTips(
-        address[] memory froms,
-        address[] memory tos,
-        address[] memory tokenAddresses,
-        uint256[] memory amounts,
-        string[] memory interactionTypes,
-        string[] memory castHashes
-    ) external onlyRelayer whenNotPaused nonReentrant {
-        uint256 length = froms.length;
-        require(
-            length == tos.length &&
-            length == tokenAddresses.length &&
-            length == amounts.length &&
-            length == interactionTypes.length &&
-            length == castHashes.length,
-            "Array length mismatch"
-        );
-
-        for (uint256 i = 0; i < length; i++) {
-            if (
-                froms[i] == address(0) ||
-                tos[i] == address(0) ||
-                tokenAddresses[i] == address(0) ||
-                amounts[i] == 0 ||
-                froms[i] == tos[i]
-            ) {
-                continue; // Skip invalid entries
-            }
-
-            IERC20 token = IERC20(tokenAddresses[i]);
-            uint256 allowance = token.allowance(froms[i], address(this));
-            
-            if (allowance >= amounts[i]) {
-                // safeTransferFrom will revert on failure (no need for try-catch)
-                token.safeTransferFrom(froms[i], tos[i], amounts[i]);
-                
-                emit TipSent(
-                    froms[i],
-                    tos[i],
-                    tokenAddresses[i],
-                    amounts[i],
-                    interactionTypes[i],
-                    castHashes[i]
-                );
-            }
+        // Transfer from sender
+        cUSD.safeTransferFrom(msg.sender, to, recipientAmount);
+        if (fee > 0) {
+            cUSD.safeTransferFrom(msg.sender, platformWallet, fee);
         }
+
+        emit Tipped(msg.sender, to, amount, fee);
     }
 
     /**
-     * @notice Users can revoke approval by setting allowance to 0
-     * @dev This is a convenience function - users can also revoke via token contract
-     * @param tokenAddress Address of the token to revoke approval for
+     * @notice Pay to boost your profile. Full amount goes to platform.
      */
-    function revokeApproval(address tokenAddress) external nonReentrant {
-        if (tokenAddress == address(0)) revert InvalidAddress();
-        
-        IERC20 token = IERC20(tokenAddress);
-        uint256 currentAllowance = token.allowance(msg.sender, address(this));
-        
-        if (currentAllowance > 0) {
-            // User needs to approve 0 themselves via token contract
-            // This function just emits an event for tracking
-            emit TokensRevoked(msg.sender, tokenAddress, currentAllowance);
-        }
+    function boost() external whenNotPaused nonReentrant {
+        if (boostPrice == 0) revert InvalidAmount();
+
+        cUSD.safeTransferFrom(msg.sender, platformWallet, boostPrice);
+
+        emit Boosted(msg.sender, boostPrice);
     }
 
-    /**
-     * @notice Get user's current allowance for a specific token
-     * @param user Address of the user
-     * @param tokenAddress Address of the token
-     * @return Current allowance amount
-     */
-    function getUserAllowance(address user, address tokenAddress) 
-        external 
-        view 
-        returns (uint256) 
-    {
-        IERC20 token = IERC20(tokenAddress);
-        return token.allowance(user, address(this));
+    // --- Owner functions ---
+
+    function setFee(uint256 _feeBps) external onlyOwner {
+        if (_feeBps > 2000) revert FeeTooHigh();
+        uint256 old = feeBps;
+        feeBps = _feeBps;
+        emit FeeUpdated(old, _feeBps);
     }
 
-    /**
-     * @notice Update the relayer address (only owner)
-     * @param newRelayer New relayer address
-     */
-    function updateRelayer(address newRelayer) external onlyOwner {
-        if (newRelayer == address(0)) revert InvalidAddress();
-        address oldRelayer = relayer;
-        relayer = newRelayer;
-        emit RelayerUpdated(oldRelayer, newRelayer);
+    function setPlatformWallet(address _wallet) external onlyOwner {
+        if (_wallet == address(0)) revert InvalidAddress();
+        address old = platformWallet;
+        platformWallet = _wallet;
+        emit PlatformWalletUpdated(old, _wallet);
     }
 
-    /**
-     * @notice Pause the contract (only owner)
-     */
-    function pause() external onlyOwner {
-        _pause();
+    function setBoostPrice(uint256 _price) external onlyOwner {
+        uint256 old = boostPrice;
+        boostPrice = _price;
+        emit BoostPriceUpdated(old, _price);
     }
 
-    /**
-     * @notice Unpause the contract (only owner)
-     */
-    function unpause() external onlyOwner {
-        _unpause();
-    }
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 
     /**
-     * @notice Emergency withdrawal function (only owner)
-     * @dev Should only be used in emergencies, as this contract shouldn't hold funds
-     * @param tokenAddress Address of token to withdraw
-     * @param amount Amount to withdraw
+     * @notice Emergency withdrawal (contract shouldn't hold funds normally)
      */
-    function emergencyWithdraw(address tokenAddress, uint256 amount) 
-        external 
-        onlyOwner 
-        nonReentrant 
-    {
-        IERC20 token = IERC20(tokenAddress);
-        token.safeTransfer(owner(), amount);
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwner nonReentrant {
+        IERC20(token).safeTransfer(owner(), amount);
     }
 }
