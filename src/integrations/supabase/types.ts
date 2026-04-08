@@ -46,32 +46,50 @@ export type Database = {
       }
       profiles: {
         Row: {
+          boost_end: string | null
+          boost_start: string | null
           connected_address: string | null
           created_at: string
           custody_address: string | null
+          description: string | null
           display_name: string | null
+          external_link: string | null
           fid: number
+          image_url: string | null
           pfp_url: string | null
+          total_tips_received: number
           updated_at: string
           username: string
         }
         Insert: {
+          boost_end?: string | null
+          boost_start?: string | null
           connected_address?: string | null
           created_at?: string
           custody_address?: string | null
+          description?: string | null
           display_name?: string | null
+          external_link?: string | null
           fid: number
+          image_url?: string | null
           pfp_url?: string | null
+          total_tips_received?: number
           updated_at?: string
           username: string
         }
         Update: {
+          boost_end?: string | null
+          boost_start?: string | null
           connected_address?: string | null
           created_at?: string
           custody_address?: string | null
+          description?: string | null
           display_name?: string | null
+          external_link?: string | null
           fid?: number
+          image_url?: string | null
           pfp_url?: string | null
+          total_tips_received?: number
           updated_at?: string
           username?: string
         }
