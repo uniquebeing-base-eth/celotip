@@ -32,7 +32,7 @@ const SendTip = () => {
     queryKey: ["cusdBalance", walletAddress],
     queryFn: async () => {
       if (!walletAddress) return 0;
-      const bal = (await publicClient.readContract({
+      const bal = (await (publicClient.readContract as any)({
         address: CUSD_ADDRESS as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "balanceOf",
@@ -76,7 +76,7 @@ const SendTip = () => {
       const amountWei = parseUnits(amount, 18);
 
       // Check allowance
-      const currentAllowance = (await publicClient.readContract({
+      const currentAllowance = (await (publicClient.readContract as any)({
         address: CUSD_ADDRESS as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "allowance",

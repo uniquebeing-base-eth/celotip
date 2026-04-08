@@ -61,7 +61,7 @@ const Settings = () => {
     queryKey: ["cusdBalanceSettings", walletAddress],
     queryFn: async () => {
       if (!walletAddress) return 0;
-      const bal = (await publicClient.readContract({
+      const bal = (await (publicClient.readContract as any)({
         address: CUSD_ADDRESS as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "balanceOf",
@@ -116,7 +116,7 @@ const Settings = () => {
       const boostWei = parseUnits(BOOST_PRICE_CUSD.toString(), 18);
 
       // Check allowance
-      const allowance = (await publicClient.readContract({
+      const allowance = (await (publicClient.readContract as any)({
         address: CUSD_ADDRESS as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "allowance",
