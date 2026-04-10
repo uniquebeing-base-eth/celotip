@@ -1,11 +1,11 @@
 // CeloTip Smart Contract Configuration
-// NOTE: Update this after deploying the new contract
+// Deployed contract: https://celoscan.io/address/0x6b3A9c2b4b4BB24D5DFa59132499cb4Fd29C733e
 export const CELOTIP_CONTRACT_ADDRESS = "0x6b3A9c2b4b4BB24D5DFa59132499cb4Fd29C733e" as const;
 
 // Platform wallet for fee collection
 export const PLATFORM_WALLET = "0xc6340F29b11F450877741a2f61A04D31Cb44d9B1" as const;
 
-// cUSD is the ONLY supported token
+// cUSD is the primary supported token
 export const CUSD_ADDRESS = "0x765DE816845861e75A25fCA122bb6898B8B1282a" as const;
 
 // Platform fee: 5% (500 basis points)
@@ -14,9 +14,14 @@ export const PLATFORM_FEE_BPS = 500;
 // Boost price in cUSD
 export const BOOST_PRICE_CUSD = 2;
 
-// Keep legacy token addresses for reference
-export const TOKEN_ADDRESSES = {
-  cUSD: "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+// Default tip amount
+export const DEFAULT_TIP_AMOUNT = 0.1;
+
+// Celo stable tokens
+export const CELO_STABLES = {
+  cUSD: { address: "0x765DE816845861e75A25fCA122bb6898B8B1282a", symbol: "cUSD", decimals: 18 },
+  cEUR: { address: "0xD8763CBa276a3738E6DE85b4b3bF5FDed6D6cA73", symbol: "cEUR", decimals: 18 },
+  cREAL: { address: "0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787", symbol: "cREAL", decimals: 18 },
 } as const;
 
 // Minimal ERC-20 ABI
@@ -57,58 +62,58 @@ export const ERC20_ABI = [
   },
 ] as const;
 
-// CeloTip Contract ABI (new version with fee split)
+// CeloTip Contract ABI — matches deployed contract (relayer-based sendTip)
 export const CELOTIP_ABI = [
   {
     inputs: [
-      { name: "_cUSD", type: "address" },
-      { name: "_platformWallet", type: "address" },
-      { name: "_feeBps", type: "uint256" },
-      { name: "_boostPrice", type: "uint256" },
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "tokenAddress", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "interactionType", type: "string" },
+      { name: "castHash", type: "string" },
     ],
-    stateMutability: "nonpayable",
-    type: "constructor",
-  },
-  {
-    inputs: [{ name: "to", type: "address" }, { name: "amount", type: "uint256" }],
-    name: "tip",
+    name: "sendTip",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [],
-    name: "boost",
+    inputs: [
+      { name: "from", type: "address[]" },
+      { name: "to", type: "address[]" },
+      { name: "tokenAddress", type: "address[]" },
+      { name: "amount", type: "uint256[]" },
+      { name: "interactionType", type: "string[]" },
+      { name: "castHash", type: "string[]" },
+    ],
+    name: "sendBatchTips",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [],
-    name: "feeBps",
+    inputs: [{ name: "tokenAddress", type: "address" }],
+    name: "revokeApproval",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "tokenAddress", type: "address" },
+    ],
+    name: "getUserAllowance",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [],
-    name: "boostPrice",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "platformWallet",
-    outputs: [{ name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "cUSD",
-    outputs: [{ name: "", type: "address" }],
-    stateMutability: "view",
+    inputs: [{ name: "newRelayer", type: "address" }],
+    name: "updateRelayer",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -116,42 +121,22 @@ export const CELOTIP_ABI = [
     inputs: [
       { indexed: true, name: "from", type: "address" },
       { indexed: true, name: "to", type: "address" },
+      { indexed: true, name: "token", type: "address" },
       { indexed: false, name: "amount", type: "uint256" },
-      { indexed: false, name: "fee", type: "uint256" },
+      { indexed: false, name: "interactionType", type: "string" },
+      { indexed: false, name: "castHash", type: "string" },
     ],
-    name: "Tipped",
+    name: "TipSent",
     type: "event",
   },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: "user", type: "address" },
-      { indexed: false, name: "amount", type: "uint256" },
-    ],
-    name: "Boosted",
-    type: "event",
-  },
+  { inputs: [], name: "relayer", outputs: [{ name: "", type: "address" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "owner", outputs: [{ name: "", type: "address" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "paused", outputs: [{ name: "", type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "pause", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [], name: "unpause", outputs: [], stateMutability: "nonpayable", type: "function" },
-  { inputs: [], name: "paused", outputs: [{ name: "", type: "bool" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "owner", outputs: [{ name: "", type: "address" }], stateMutability: "view", type: "function" },
   {
-    inputs: [{ name: "_feeBps", type: "uint256" }],
-    name: "setFee",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "_wallet", type: "address" }],
-    name: "setPlatformWallet",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "_price", type: "uint256" }],
-    name: "setBoostPrice",
+    inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }],
+    name: "emergencyWithdraw",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

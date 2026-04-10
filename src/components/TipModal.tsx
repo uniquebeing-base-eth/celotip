@@ -7,18 +7,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Loader2, CheckCircle2, DollarSign } from "lucide-react";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import { CELOTIP_CONTRACT_ADDRESS, CELOTIP_ABI, CUSD_ADDRESS, ERC20_ABI, PLATFORM_FEE_BPS } from "@/lib/contracts";
-import { createPublicClient, createWalletClient, custom, http, parseUnits, formatUnits } from "viem";
-import { celo } from "viem/chains";
+import { CUSD_ADDRESS, PLATFORM_FEE_BPS } from "@/lib/contracts";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-const publicClient = createPublicClient({ chain: celo, transport: http() });
-
-const PRESETS = ["0.1", "0.5", "1"];
+import { useQuery } from "@tanstack/react-query";
 
 interface TipModalProps {
   open: boolean;
@@ -28,88 +22,74 @@ interface TipModalProps {
 }
 
 export const TipModal = ({ open, onClose, recipientAddress, recipientName }: TipModalProps) => {
-  const { walletAddress, fid, getProvider } = useWalletAuth();
-  const [amount, setAmount] = useState("0.5");
+  const { walletAddress, fid } = useWalletAuth();
   const [isSending, setIsSending] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
 
-  const fee = (parseFloat(amount || "0") * PLATFORM_FEE_BPS) / 10000;
-  const recipientGets = parseFloat(amount || "0") - fee;
+  // Get user's tip config
+  const { data: tipConfig } = useQuery({
+    queryKey: ["tipConfig", fid],
+    queryFn: async () => {
+      if (!fid) return null;
+      const { data } = await supabase
+        .from("tip_configs")
+        .select("*")
+        .eq("fid", fid)
+        .eq("interaction_type", "tip")
+        .eq("is_enabled", true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!fid,
+  });
+
+  const amount = tipConfig?.amount || 0;
+  const tokenSymbol = tipConfig?.token_symbol || "cUSD";
+  const fee = (amount * PLATFORM_FEE_BPS) / 10000;
+  const recipientGets = amount - fee;
 
   const handleTip = async () => {
     if (!walletAddress || !fid) return;
+
+    if (!tipConfig) {
+      toast({
+        title: "Set up tipping first",
+        description: "Go to Settings → Tip Configuration to set your tip amount and approve tokens.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSending(true);
     try {
-      const provider = await getProvider();
-      if (!provider) throw new Error("No wallet provider");
-
-      const walletClient = createWalletClient({ chain: celo, transport: custom(provider) });
-      const amountWei = parseUnits(amount, 18);
-
-      // Check allowance
-      const currentAllowance = (await (publicClient.readContract as any)({
-        address: CUSD_ADDRESS as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: "allowance",
-        args: [walletAddress as `0x${string}`, CELOTIP_CONTRACT_ADDRESS as `0x${string}`],
-      })) as bigint;
-
-      if (currentAllowance < amountWei) {
-        const approveTx = await walletClient.writeContract({
-          address: CUSD_ADDRESS as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [CELOTIP_CONTRACT_ADDRESS as `0x${string}`, amountWei],
-          account: walletAddress as `0x${string}`,
-          chain: celo,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveTx });
-      }
-
-      // Send tip via contract
-      const hash = await walletClient.writeContract({
-        address: CELOTIP_CONTRACT_ADDRESS as `0x${string}`,
-        abi: CELOTIP_ABI,
-        functionName: "tip",
-        args: [recipientAddress as `0x${string}`, amountWei],
-        account: walletAddress as `0x${string}`,
-        chain: celo,
+      // Get recipient's FID
+      const { data: recipientFid } = await supabase.rpc("get_or_create_profile_by_wallet", {
+        p_wallet_address: recipientAddress.toLowerCase(),
       });
 
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      // Call the backend relayer to process the tip
+      const { data, error } = await supabase.functions.invoke("process-tip", {
+        body: {
+          fromFid: fid,
+          toFid: recipientFid || 0,
+          interactionType: "tip",
+          castHash: "",
+        },
+      });
 
-      if (receipt.status === "success") {
-        // Record in DB
-        const { data: recipientFid } = await supabase.rpc("get_or_create_profile_by_wallet", {
-          p_wallet_address: recipientAddress.toLowerCase(),
-        });
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.message || "Tip failed");
 
-        await supabase.from("transactions").insert({
-          from_fid: fid,
-          to_fid: recipientFid || 0,
-          amount: parseFloat(amount),
-          token_address: CUSD_ADDRESS,
-          token_symbol: "cUSD",
-          interaction_type: "tip",
-          status: "completed",
-          tx_hash: hash,
-        });
-
-        // Update recipient total tips
-        await supabase.rpc("get_or_create_profile_by_wallet", {
-          p_wallet_address: recipientAddress.toLowerCase(),
-        });
-
-        setTxHash(hash);
-        toast({ title: "Tip sent! 🎉", description: `${amount} cUSD sent to ${recipientName}` });
-      } else {
-        throw new Error("Transaction reverted");
-      }
+      setTxHash(data.txHash);
+      toast({
+        title: "Tip sent! 🎉",
+        description: `${amount} ${tokenSymbol} sent to ${recipientName}`,
+      });
     } catch (error: any) {
       console.error("Tip failed:", error);
       toast({
         title: "Tip Failed",
-        description: error.shortMessage || error.message || "Please try again.",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -119,7 +99,6 @@ export const TipModal = ({ open, onClose, recipientAddress, recipientName }: Tip
 
   const handleClose = () => {
     setTxHash(null);
-    setAmount("0.5");
     onClose();
   };
 
@@ -134,7 +113,7 @@ export const TipModal = ({ open, onClose, recipientAddress, recipientName }: Tip
             <DialogHeader>
               <DialogTitle>Tip Sent!</DialogTitle>
               <DialogDescription>
-                {amount} cUSD sent to {recipientName}
+                {amount} {tokenSymbol} sent to {recipientName}
               </DialogDescription>
             </DialogHeader>
             <a
@@ -155,65 +134,50 @@ export const TipModal = ({ open, onClose, recipientAddress, recipientName }: Tip
                 Tip {recipientName}
               </DialogTitle>
               <DialogDescription>
-                Send cUSD to {recipientAddress.slice(0, 8)}...{recipientAddress.slice(-4)}
+                Send {tokenSymbol} to {recipientAddress.slice(0, 8)}...{recipientAddress.slice(-4)}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              {/* Presets */}
-              <div className="flex gap-2">
-                {PRESETS.map((p) => (
-                  <Button
-                    key={p}
-                    variant={amount === p ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => setAmount(p)}
-                  >
-                    {p} cUSD
-                  </Button>
-                ))}
-              </div>
-
-              {/* Custom amount */}
-              <Input
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="text-center text-xl font-bold h-12"
-                placeholder="0.00"
-              />
-
-              {/* Summary */}
-              {parseFloat(amount) > 0 && (
-                <div className="p-3 bg-secondary/50 rounded-lg space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Recipient gets</span>
-                    <span className="font-medium text-foreground">{recipientGets.toFixed(4)} cUSD</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Platform fee ({PLATFORM_FEE_BPS / 100}%)</span>
-                    <span className="text-muted-foreground">{fee.toFixed(4)} cUSD</span>
-                  </div>
-                  <div className="border-t border-border pt-1 flex justify-between font-medium">
-                    <span className="text-foreground">Total</span>
-                    <span className="text-foreground">{amount} cUSD</span>
-                  </div>
+              {!tipConfig ? (
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-center">
+                  <p className="text-sm font-medium text-destructive">No tip configuration found</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Go to Settings to set your tip amount and approve tokens first.
+                  </p>
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* Tip summary */}
+                  <div className="text-center py-4">
+                    <p className="text-4xl font-bold text-foreground">{amount}</p>
+                    <p className="text-lg text-muted-foreground">{tokenSymbol}</p>
+                  </div>
 
-              <Button
-                onClick={handleTip}
-                className="w-full h-12 text-base"
-                disabled={isSending || parseFloat(amount) <= 0}
-              >
-                {isSending ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Confirming...</>
-                ) : (
-                  <>Send {amount} cUSD</>
-                )}
-              </Button>
+                  <div className="p-3 bg-secondary/50 rounded-lg space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Recipient gets</span>
+                      <span className="font-medium text-foreground">{recipientGets.toFixed(4)} {tokenSymbol}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Platform fee ({PLATFORM_FEE_BPS / 100}%)</span>
+                      <span className="text-muted-foreground">{fee.toFixed(4)} {tokenSymbol}</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleTip}
+                    className="w-full h-12 text-base"
+                    disabled={isSending}
+                  >
+                    {isSending ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending via relayer...</>
+                    ) : (
+                      <>Send {amount} {tokenSymbol}</>
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </>
         )}

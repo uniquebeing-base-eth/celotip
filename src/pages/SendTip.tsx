@@ -5,52 +5,51 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { CELOTIP_CONTRACT_ADDRESS, CELOTIP_ABI, CUSD_ADDRESS, ERC20_ABI, PLATFORM_FEE_BPS } from "@/lib/contracts";
+import { CUSD_ADDRESS, PLATFORM_FEE_BPS } from "@/lib/contracts";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { createPublicClient, createWalletClient, custom, http, parseUnits, formatUnits } from "viem";
-import { celo } from "viem/chains";
 import { useQuery } from "@tanstack/react-query";
 import { Send, Loader2, CheckCircle2, ArrowLeft, Wallet, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const publicClient = createPublicClient({ chain: celo, transport: http() });
-
-const QUICK_AMOUNTS = ["0.10", "0.50", "1.00", "5.00"];
-
 const SendTip = () => {
   const navigate = useNavigate();
-  const { walletAddress, fid, isConnected, getProvider } = useWalletAuth();
+  const { walletAddress, fid, isConnected } = useWalletAuth();
   const [recipientAddress, setRecipientAddress] = useState("");
-  const [amount, setAmount] = useState("1.00");
   const [isSending, setIsSending] = useState(false);
   const [txSuccess, setTxSuccess] = useState<string | null>(null);
 
-  // Fetch cUSD balance
-  const { data: balance } = useQuery({
-    queryKey: ["cusdBalance", walletAddress],
+  // Get tip config
+  const { data: tipConfig } = useQuery({
+    queryKey: ["tipConfig", fid],
     queryFn: async () => {
-      if (!walletAddress) return 0;
-      const bal = (await (publicClient.readContract as any)({
-        address: CUSD_ADDRESS as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: "balanceOf",
-        args: [walletAddress as `0x${string}`],
-      })) as bigint;
-      return parseFloat(formatUnits(bal, 18));
+      if (!fid) return null;
+      const { data } = await supabase
+        .from("tip_configs")
+        .select("*")
+        .eq("fid", fid)
+        .eq("interaction_type", "tip")
+        .eq("is_enabled", true)
+        .maybeSingle();
+      return data;
     },
-    enabled: !!walletAddress,
-    staleTime: 30000,
+    enabled: !!fid,
   });
 
-  const currentBalance = balance || 0;
-  const fee = (parseFloat(amount || "0") * PLATFORM_FEE_BPS) / 10000;
-  const recipientGets = parseFloat(amount || "0") - fee;
+  const amount = tipConfig?.amount || 0;
+  const tokenSymbol = tipConfig?.token_symbol || "cUSD";
+  const fee = (amount * PLATFORM_FEE_BPS) / 10000;
+  const recipientGets = amount - fee;
   const isValidAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 
   const handleSend = async () => {
     if (!walletAddress || !fid) return;
+
+    if (!tipConfig) {
+      toast({ title: "Set up tipping first", description: "Go to Settings to configure your tip amount.", variant: "destructive" });
+      return;
+    }
 
     if (!isValidAddress(recipientAddress)) {
       toast({ title: "Invalid Address", description: "Enter a valid Celo wallet address.", variant: "destructive" });
@@ -61,76 +60,31 @@ const SendTip = () => {
       return;
     }
 
-    const tipAmount = parseFloat(amount);
-    if (tipAmount <= 0 || tipAmount > currentBalance) {
-      toast({ title: "Invalid Amount", description: tipAmount > currentBalance ? "Insufficient cUSD." : "Enter a valid amount.", variant: "destructive" });
-      return;
-    }
-
     setIsSending(true);
     try {
-      const provider = await getProvider();
-      if (!provider) throw new Error("No wallet provider");
-
-      const walletClient = createWalletClient({ chain: celo, transport: custom(provider) });
-      const amountWei = parseUnits(amount, 18);
-
-      // Check allowance
-      const currentAllowance = (await (publicClient.readContract as any)({
-        address: CUSD_ADDRESS as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: "allowance",
-        args: [walletAddress as `0x${string}`, CELOTIP_CONTRACT_ADDRESS as `0x${string}`],
-      })) as bigint;
-
-      if (currentAllowance < amountWei) {
-        const approveTx = await walletClient.writeContract({
-          address: CUSD_ADDRESS as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [CELOTIP_CONTRACT_ADDRESS as `0x${string}`, amountWei],
-          account: walletAddress as `0x${string}`,
-          chain: celo,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveTx });
-      }
-
-      // Send tip
-      const txHash = await walletClient.writeContract({
-        address: CELOTIP_CONTRACT_ADDRESS as `0x${string}`,
-        abi: CELOTIP_ABI,
-        functionName: "tip",
-        args: [recipientAddress as `0x${string}`, amountWei],
-        account: walletAddress as `0x${string}`,
-        chain: celo,
+      // Get recipient FID
+      const { data: recipientFid } = await supabase.rpc("get_or_create_profile_by_wallet", {
+        p_wallet_address: recipientAddress.toLowerCase(),
       });
 
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      // Call backend relayer
+      const { data, error } = await supabase.functions.invoke("process-tip", {
+        body: {
+          fromFid: fid,
+          toFid: recipientFid || 0,
+          interactionType: "direct",
+          castHash: "",
+        },
+      });
 
-      if (receipt.status === "success") {
-        const { data: recipientFid } = await supabase.rpc("get_or_create_profile_by_wallet", {
-          p_wallet_address: recipientAddress.toLowerCase(),
-        });
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.message || "Tip failed");
 
-        await supabase.from("transactions").insert({
-          from_fid: fid,
-          to_fid: recipientFid || 0,
-          amount: tipAmount,
-          token_address: CUSD_ADDRESS,
-          token_symbol: "cUSD",
-          interaction_type: "direct",
-          status: "completed",
-          tx_hash: txHash,
-        });
-
-        setTxSuccess(txHash);
-        toast({ title: "Tip Sent! 🎉", description: `${amount} cUSD sent successfully.` });
-      } else {
-        throw new Error("Transaction reverted");
-      }
+      setTxSuccess(data.txHash);
+      toast({ title: "Tip Sent! 🎉", description: `${amount} ${tokenSymbol} sent successfully.` });
     } catch (error: any) {
       console.error("Send tip failed:", error);
-      toast({ title: "Failed", description: error.shortMessage || error.message, variant: "destructive" });
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
     } finally {
       setIsSending(false);
     }
@@ -147,13 +101,13 @@ const SendTip = () => {
             </div>
             <h2 className="text-2xl font-bold text-foreground mb-2">Tip Sent!</h2>
             <p className="text-muted-foreground mb-2">
-              {amount} cUSD → {recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}
+              {amount} {tokenSymbol} → {recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}
             </p>
             <a href={`https://celoscan.io/tx/${txSuccess}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline mb-6 block">
               View on Celoscan →
             </a>
             <div className="flex gap-3">
-              <Button onClick={() => { setTxSuccess(null); setRecipientAddress(""); setAmount("1.00"); }} variant="outline" className="flex-1">Send Another</Button>
+              <Button onClick={() => { setTxSuccess(null); setRecipientAddress(""); }} variant="outline" className="flex-1">Send Another</Button>
               <Button onClick={() => navigate("/")} className="flex-1">Back Home</Button>
             </div>
           </Card>
@@ -172,7 +126,7 @@ const SendTip = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Send cUSD</h2>
+            <h2 className="text-2xl font-bold text-foreground">Send Tip</h2>
             <p className="text-sm text-muted-foreground">Tip any wallet address directly</p>
           </div>
         </div>
@@ -182,8 +136,19 @@ const SendTip = () => {
             <Wallet className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground">Connect your wallet to send tips</p>
           </Card>
+        ) : !tipConfig ? (
+          <Card className="p-6 text-center border-border shadow-card">
+            <DollarSign className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground mb-1">No tip config set</p>
+            <p className="text-xs text-muted-foreground mb-4">Set your tip amount and approve tokens in Settings first.</p>
+            <Button onClick={() => navigate("/settings")} variant="outline">Go to Settings</Button>
+          </Card>
         ) : (
           <Card className="p-6 border-border shadow-card space-y-5">
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm text-center">
+              <p className="text-primary font-medium">Tip: {tipConfig.amount} {tipConfig.token_symbol} per tap</p>
+            </div>
+
             <div>
               <Label className="text-sm font-medium mb-2 block">Recipient Address</Label>
               <Input
@@ -194,37 +159,19 @@ const SendTip = () => {
               />
             </div>
 
-            <div>
-              <div className="flex justify-between mb-2">
-                <Label className="text-sm font-medium">Amount (cUSD)</Label>
-                <span className="text-xs text-muted-foreground">Balance: {currentBalance.toFixed(2)} cUSD</span>
-              </div>
-              <Input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="text-center text-2xl font-bold h-14"
-                placeholder="0.00"
-              />
-              <div className="flex gap-2 mt-3">
-                {QUICK_AMOUNTS.map((qa) => (
-                  <Button key={qa} variant={amount === qa ? "default" : "outline"} size="sm" className="flex-1 text-xs" onClick={() => setAmount(qa)}>
-                    {qa}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {recipientAddress && isValidAddress(recipientAddress) && parseFloat(amount) > 0 && (
+            {recipientAddress && isValidAddress(recipientAddress) && (
               <div className="p-4 bg-secondary/50 border border-border rounded-lg space-y-2 text-sm">
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sending</span>
+                  <span className="font-medium text-foreground">{amount} {tokenSymbol}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Recipient gets</span>
-                  <span className="font-medium text-foreground">{recipientGets.toFixed(4)} cUSD</span>
+                  <span className="font-medium text-foreground">{recipientGets.toFixed(4)} {tokenSymbol}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Fee ({PLATFORM_FEE_BPS / 100}%)</span>
-                  <span className="text-muted-foreground">{fee.toFixed(4)} cUSD</span>
+                  <span className="text-muted-foreground">{fee.toFixed(4)} {tokenSymbol}</span>
                 </div>
                 <div className="flex justify-between border-t border-border pt-1">
                   <span className="text-muted-foreground">To</span>
@@ -236,12 +183,12 @@ const SendTip = () => {
             <Button
               onClick={handleSend}
               className="w-full h-14 text-lg"
-              disabled={isSending || !isValidAddress(recipientAddress) || parseFloat(amount) <= 0 || parseFloat(amount) > currentBalance}
+              disabled={isSending || !isValidAddress(recipientAddress)}
             >
               {isSending ? (
                 <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Sending...</>
               ) : (
-                <><DollarSign className="h-5 w-5 mr-2" />Send {amount} cUSD</>
+                <><DollarSign className="h-5 w-5 mr-2" />Send {amount} {tokenSymbol}</>
               )}
             </Button>
           </Card>
