@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { X } from "lucide-react";
-import { TOKEN_ADDRESSES } from "@/lib/contracts";
+import { CELO_STABLES } from "@/lib/contracts";
 
 interface Token {
   symbol: string;
