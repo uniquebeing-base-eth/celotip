@@ -1,4 +1,3 @@
-
 import { User, Wallet } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { WalletPopover } from "@/components/WalletPopover";
+import celotipLogo from "@/assets/celotip-logo.png";
 
 export const Header = () => {
   const { walletAddress, displayName, pfpUrl, walletSource, isLoading, isConnected, connect } = useWalletAuth();
@@ -17,9 +17,7 @@ export const Header = () => {
       <div className="max-w-2xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">CT</span>
-            </div>
+            <img src={celotipLogo} alt="CeloTip" className="w-9 h-9 rounded-xl" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-foreground">CeloTip</h1>
