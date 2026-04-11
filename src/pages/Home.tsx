@@ -28,7 +28,7 @@ const Home = () => {
         .order("total_tips_received", { ascending: false })
         .limit(10);
 
-      const boostedAddresses = new Set((boosted || []).map(p => p.connected_address));
+      const boostedFids = new Set((boosted || []).map(p => p.fid));
       const remaining = 10 - (boosted?.length || 0);
 
       let topProfiles: typeof boosted = [];
@@ -37,10 +37,10 @@ const Home = () => {
           .from("profiles")
           .select("*")
           .order("total_tips_received", { ascending: false })
-          .limit(remaining + 10); // fetch extra to filter
+          .limit(remaining + 20);
 
         topProfiles = (data || []).filter(
-          p => !boostedAddresses.has(p.connected_address) && p.display_name && p.display_name !== "MiniPay User"
+          p => !boostedFids.has(p.fid) && p.connected_address
         ).slice(0, remaining);
       }
 
