@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { CUSD_ADDRESS, PLATFORM_FEE_BPS } from "@/lib/contracts";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -20,7 +19,6 @@ const SendTip = () => {
   const [isSending, setIsSending] = useState(false);
   const [txSuccess, setTxSuccess] = useState<string | null>(null);
 
-  // Get tip config
   const { data: tipConfig } = useQuery({
     queryKey: ["tipConfig", fid],
     queryFn: async () => {
@@ -39,8 +37,6 @@ const SendTip = () => {
 
   const amount = tipConfig?.amount || 0;
   const tokenSymbol = tipConfig?.token_symbol || "cUSD";
-  const fee = (amount * PLATFORM_FEE_BPS) / 10000;
-  const recipientGets = amount - fee;
   const isValidAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 
   const handleSend = async () => {
@@ -62,17 +58,15 @@ const SendTip = () => {
 
     setIsSending(true);
     try {
-      // Get recipient FID
       const { data: recipientFid } = await supabase.rpc("get_or_create_profile_by_wallet", {
         p_wallet_address: recipientAddress.toLowerCase(),
       });
 
-      // Call backend relayer
       const { data, error } = await supabase.functions.invoke("process-tip", {
         body: {
           fromFid: fid,
           toFid: recipientFid || 0,
-          interactionType: "direct",
+          interactionType: "tip",
           castHash: "",
         },
       });
@@ -164,14 +158,6 @@ const SendTip = () => {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Sending</span>
                   <span className="font-medium text-foreground">{amount} {tokenSymbol}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Recipient gets</span>
-                  <span className="font-medium text-foreground">{recipientGets.toFixed(4)} {tokenSymbol}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fee ({PLATFORM_FEE_BPS / 100}%)</span>
-                  <span className="text-muted-foreground">{fee.toFixed(4)} {tokenSymbol}</span>
                 </div>
                 <div className="flex justify-between border-t border-border pt-1">
                   <span className="text-muted-foreground">To</span>

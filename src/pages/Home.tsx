@@ -2,19 +2,37 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { ProfileCard } from "@/components/ProfileCard";
-import { TipModal } from "@/components/TipModal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { toast } from "@/hooks/use-toast";
 import { Loader2, Wallet, Users, Sparkles } from "lucide-react";
 
 const Home = () => {
-  const { isConnected, connect, isLoading: authLoading } = useWalletAuth();
-  const [tipTarget, setTipTarget] = useState<{ address: string; name: string } | null>(null);
+  const { isConnected, connect, walletAddress, fid, isLoading: authLoading } = useWalletAuth();
+  const queryClient = useQueryClient();
+  const [sendingTo, setSendingTo] = useState<string | null>(null);
 
-  // Fetch featured profiles: boosted first, then by total tips, limit 10
+  // Get user's tip config for instant tipping
+  const { data: tipConfig } = useQuery({
+    queryKey: ["tipConfig", fid],
+    queryFn: async () => {
+      if (!fid) return null;
+      const { data } = await supabase
+        .from("tip_configs")
+        .select("*")
+        .eq("fid", fid)
+        .eq("interaction_type", "tip")
+        .eq("is_enabled", true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!fid,
+  });
+
+  // Fetch featured profiles: boosted first, then all by total tips
   const { data: featuredProfiles, isLoading } = useQuery({
     queryKey: ["featuredProfiles"],
     queryFn: async () => {
@@ -36,11 +54,12 @@ const Home = () => {
         const { data } = await supabase
           .from("profiles")
           .select("*")
+          .not("connected_address", "is", null)
           .order("total_tips_received", { ascending: false })
           .limit(remaining + 20);
 
         topProfiles = (data || []).filter(
-          p => !boostedFids.has(p.fid) && p.connected_address
+          p => !boostedFids.has(p.fid)
         ).slice(0, remaining);
       }
 
@@ -51,6 +70,64 @@ const Home = () => {
     },
     staleTime: 15000,
   });
+
+  // Instant tip handler - no modal, just send
+  const handleInstantTip = async (recipientAddress: string, recipientName: string) => {
+    if (!walletAddress || !fid) {
+      toast({ title: "Connect wallet first", variant: "destructive" });
+      return;
+    }
+
+    if (!tipConfig) {
+      toast({
+        title: "Set up tipping first",
+        description: "Go to Settings to set your tip amount and approve tokens.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (recipientAddress.toLowerCase() === walletAddress.toLowerCase()) {
+      toast({ title: "Can't tip yourself", variant: "destructive" });
+      return;
+    }
+
+    setSendingTo(recipientAddress);
+
+    try {
+      const { data: recipientFid } = await supabase.rpc("get_or_create_profile_by_wallet", {
+        p_wallet_address: recipientAddress.toLowerCase(),
+      });
+
+      const { data, error } = await supabase.functions.invoke("process-tip", {
+        body: {
+          fromFid: fid,
+          toFid: recipientFid || 0,
+          interactionType: "tip",
+          castHash: "",
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.message || "Tip failed");
+
+      toast({
+        title: "Tip sent! 🎉",
+        description: `${tipConfig.amount} ${tipConfig.token_symbol} sent to ${recipientName}`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["featuredProfiles"] });
+    } catch (error: any) {
+      console.error("Tip failed:", error);
+      toast({
+        title: "Tip Failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingTo(null);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -109,14 +186,15 @@ const Home = () => {
                   imageUrl={profile.image_url}
                   totalTipsReceived={Number(profile.total_tips_received) || 0}
                   isBoosted={profile.isBoosted}
-                  onTip={(addr, name) => setTipTarget({ address: addr, name })}
+                  isSending={sendingTo === profile.connected_address}
+                  onTip={handleInstantTip}
                 />
               ))}
             </div>
           ) : (
             <Card className="p-8 text-center border-border shadow-card">
               <Users className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">No featured profiles yet</p>
+              <p className="text-sm text-muted-foreground">No profiles yet</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Create your profile in Settings to get listed!
               </p>
@@ -124,15 +202,6 @@ const Home = () => {
           )}
         </div>
       </main>
-
-      {tipTarget && (
-        <TipModal
-          open={!!tipTarget}
-          onClose={() => setTipTarget(null)}
-          recipientAddress={tipTarget.address}
-          recipientName={tipTarget.name}
-        />
-      )}
 
       <BottomNav />
     </div>

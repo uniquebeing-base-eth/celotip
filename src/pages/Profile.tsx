@@ -6,15 +6,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { TipModal } from "@/components/TipModal";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, DollarSign, ExternalLink, Zap, Loader2, Link as LinkIcon } from "lucide-react";
 
 const Profile = () => {
   const { address } = useParams<{ address: string }>();
   const navigate = useNavigate();
-  const [tipOpen, setTipOpen] = useState(false);
+  const { walletAddress, fid } = useWalletAuth();
+  const [isSending, setIsSending] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", address],
@@ -31,10 +33,61 @@ const Profile = () => {
     enabled: !!address,
   });
 
-  const formatAddr = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  const { data: tipConfig } = useQuery({
+    queryKey: ["tipConfig", fid],
+    queryFn: async () => {
+      if (!fid) return null;
+      const { data } = await supabase
+        .from("tip_configs")
+        .select("*")
+        .eq("fid", fid)
+        .eq("interaction_type", "tip")
+        .eq("is_enabled", true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!fid,
+  });
 
+  const formatAddr = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   const isBoosted = profile?.boost_end ? new Date(profile.boost_end) > new Date() : false;
   const displayName = profile?.display_name || profile?.username || (address ? formatAddr(address) : "User");
+
+  const handleInstantTip = async () => {
+    if (!walletAddress || !fid || !address) {
+      toast({ title: "Connect wallet first", variant: "destructive" });
+      return;
+    }
+    if (!tipConfig) {
+      toast({ title: "Set up tipping first", description: "Go to Settings to configure your tip amount.", variant: "destructive" });
+      return;
+    }
+    if (address.toLowerCase() === walletAddress.toLowerCase()) {
+      toast({ title: "Can't tip yourself", variant: "destructive" });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const { data: recipientFid } = await supabase.rpc("get_or_create_profile_by_wallet", {
+        p_wallet_address: address.toLowerCase(),
+      });
+
+      const { data, error } = await supabase.functions.invoke("process-tip", {
+        body: { fromFid: fid, toFid: recipientFid || 0, interactionType: "tip", castHash: "" },
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.message || "Tip failed");
+
+      toast({ title: "Tip sent! 🎉", description: `${tipConfig.amount} ${tipConfig.token_symbol} sent to ${displayName}` });
+    } catch (error: any) {
+      console.error("Tip failed:", error);
+      toast({ title: "Tip Failed", description: error.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -105,23 +158,18 @@ const Profile = () => {
           </div>
 
           <Button
-            onClick={() => setTipOpen(true)}
+            onClick={handleInstantTip}
             className="mt-6 px-8 h-12 text-base"
+            disabled={isSending}
           >
-            <DollarSign className="h-5 w-5 mr-2" />
-            Tip with MiniPay
+            {isSending ? (
+              <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Sending...</>
+            ) : (
+              <><DollarSign className="h-5 w-5 mr-2" />Tip with MiniPay</>
+            )}
           </Button>
         </Card>
       </main>
-
-      {address && (
-        <TipModal
-          open={tipOpen}
-          onClose={() => setTipOpen(false)}
-          recipientAddress={address}
-          recipientName={displayName}
-        />
-      )}
 
       <BottomNav />
     </div>
