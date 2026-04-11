@@ -9,7 +9,7 @@ export const PLATFORM_WALLET = "0xc6340F29b11F450877741a2f61A04D31Cb44d9B1" as c
 export const CUSD_ADDRESS = "0x765DE816845861e75A25fCA122bb6898B8B1282a" as const;
 
 // Platform fee: 5% (500 basis points)
-export const PLATFORM_FEE_BPS = 500;
+export const PLATFORM_FEE_BPS = 0;
 
 // Boost price in cUSD
 export const BOOST_PRICE_CUSD = 2;

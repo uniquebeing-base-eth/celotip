@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Zap, DollarSign } from "lucide-react";
+import { Zap, DollarSign, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface ProfileCardProps {
@@ -12,6 +12,7 @@ interface ProfileCardProps {
   imageUrl?: string | null;
   totalTipsReceived: number;
   isBoosted: boolean;
+  isSending?: boolean;
   onTip: (address: string, name: string) => void;
 }
 
@@ -22,6 +23,7 @@ export const ProfileCard = ({
   imageUrl,
   totalTipsReceived,
   isBoosted,
+  isSending,
   onTip,
 }: ProfileCardProps) => {
   const navigate = useNavigate();
@@ -64,12 +66,13 @@ export const ProfileCard = ({
         <Button
           size="sm"
           className="bg-primary text-primary-foreground hover:bg-primary/90 flex-shrink-0"
+          disabled={isSending}
           onClick={(e) => {
             e.stopPropagation();
             onTip(walletAddress, name);
           }}
         >
-          Tip
+          {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tip"}
         </Button>
       </div>
     </Card>
