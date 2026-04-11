@@ -1,0 +1,2 @@
+ALTER TABLE public.tip_configs DROP CONSTRAINT tip_configs_interaction_type_check;
+ALTER TABLE public.tip_configs ADD CONSTRAINT tip_configs_interaction_type_check CHECK (interaction_type = ANY (ARRAY['like','comment','recast','quote','follow','tip']));
